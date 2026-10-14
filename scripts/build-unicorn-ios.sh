@@ -24,9 +24,27 @@ tar -xzf "$BUILD_DIR/unicorn.tar.gz" -C "$BUILD_DIR"
 
 # iOS W^X: the JIT buffer is toggled between writable and executable instead of
 # using RWX or MAP_JIT, neither of which a sandboxed process may use.
-patch -d "$BUILD_DIR/unicorn-$UNICORN_VERSION" -p1 < "$ROOT/patches/unicorn-ios.patch"
-
 # The patch targets src/qemu/... which matches the extracted layout.
+# Note: the upstream ipatool patch uses qemu/... without the src/ prefix and
+# would fail against this tarball; its CI never runs SAP on iOS so the failure
+# is invisible there.
+PATCH_FILE="$ROOT/patches/unicorn-ios.patch"
+EXTRACT_DIR="$BUILD_DIR/unicorn-$UNICORN_VERSION"
+
+if [ ! -s "$PATCH_FILE" ]; then
+  echo "::error::patch file missing or empty: $PATCH_FILE" >&2
+  exit 1
+fi
+
+echo "==> applying $(grep -c '^--- ' "$PATCH_FILE") file sections"
+ls -l "$EXTRACT_DIR/src/qemu/configure" "$EXTRACT_DIR/src/uc.c"
+
+# --batch never prompts; a missing file becomes a hard error instead of an
+# interactive question that stalls the runner.
+patch --batch -d "$EXTRACT_DIR" -p1 < "$PATCH_FILE"
+
+echo "==> patch applied"
+grep -n "ipatool_jit_write_protect" "$EXTRACT_DIR/src/qemu/accel/tcg/translate-all.c" | head -n 3
 
 SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path)
 
