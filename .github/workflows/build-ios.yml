@@ -47,7 +47,7 @@ jobs:
         run: |
           git lfs install
           git lfs pull
-          ./scripts/stage-assets.sh "$GITHUB_WORKSPACE/VendorAssets" "$GITHUB_WORKSPACE/build/sap-assets"
+          sh scripts/stage-assets.sh "$GITHUB_WORKSPACE/VendorAssets" "$GITHUB_WORKSPACE/build/sap-assets"
 
       - name: Run Go unit tests
         working-directory: sapbridge
@@ -59,7 +59,7 @@ jobs:
 
       - name: Build Unicorn for iOS arm64
         run: |
-          ./scripts/build-unicorn-ios.sh
+          sh scripts/build-unicorn-ios.sh
 
       - name: Bind the bridge into an iOS framework
         working-directory: sapbridge
@@ -146,7 +146,7 @@ jobs:
 
       - name: Package as IPA
         run: |
-          ./scripts/package-ipa.sh "${{ steps.app.outputs.path }}" DLiPA-unsigned.ipa
+          sh scripts/package-ipa.sh "${{ steps.app.outputs.path }}" DLiPA-unsigned.ipa
           ls -la DLiPA-unsigned.ipa
 
       - name: Report IPA contents
