@@ -67,10 +67,29 @@ jobs:
           CGO_ENABLED: "1"
           GOOS: ios
           GOARCH: arm64
+          # Force-load the Unicorn archive and export its symbols so purego can
+          # resolve them at runtime on iOS.
+          CGO_LDFLAGS: -Wl,-force_load,${{ github.workspace }}/build/ios/libunicorn.a -Wl,-export_dynamic
         run: |
           go install golang.org/x/mobile/cmd/gomobile@latest
           gomobile init
           gomobile bind -target=ios -o ../app/DLiPA/Frameworks/SapBridge.framework .
+          echo "==> framework contents"
+          ls -la ../app/DLiPA/Frameworks/SapBridge.framework
+
+      - name: Verify the framework contains Unicorn
+        run: |
+          # A missing Unicorn backend only shows up as uc_open failing at
+          # runtime, which is invisible until the app runs. Check here.
+          FRAMEWORK=app/DLiPA/Frameworks/SapBridge.framework/SapBridge
+          if nm -A "$FRAMEWORK" 2>/dev/null | grep -q uc_open; then
+            echo "==> Unicorn symbols present"
+          else
+            echo "::error::uc_open not found; Unicorn is not linked into the framework"
+            exit 1
+          fi
+          echo "==> exported uc_ symbols:"
+          nm -A "$FRAMEWORK" 2>/dev/null | grep -c " T uc_" || true
 
       - name: Pack the framework for the app job
         id: pack

@@ -30,7 +30,8 @@ patch -d "$BUILD_DIR/unicorn-$UNICORN_VERSION" -p1 < "$ROOT/patches/unicorn-ios.
 
 SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path)
 
-cmake -S "$BUILD_DIR/unicorn-$UNICORN_VERSION" -B "$BUILD_DIR/build" \
+SRC_DIR="$BUILD_DIR/unicorn-$UNICORN_VERSION/src"
+cmake -S "$SRC_DIR" -B "$BUILD_DIR/build" \
   -DCMAKE_SYSTEM_NAME=iOS \
   -DCMAKE_OSX_SYSROOT="$SDKROOT" \
   -DCMAKE_OSX_ARCHITECTURES=arm64 \
@@ -43,8 +44,20 @@ cmake -S "$BUILD_DIR/unicorn-$UNICORN_VERSION" -B "$BUILD_DIR/build" \
   -DUNICORN_INSTALL=OFF
 cmake --build "$BUILD_DIR/build" --parallel "$(sysctl -n hw.ncpu)"
 
+# With BUILD_SHARED_LIBS=OFF CMake renames the target to unicorn-static, so the
+# archive lands as libunicorn-static.a.
+ARCHIVE="$BUILD_DIR/build/libunicorn-static.a"
+if [ ! -f "$ARCHIVE" ]; then
+  ARCHIVE=$(find "$BUILD_DIR/build" -name "libunicorn*.a" | head -n 1)
+fi
+if [ -z "$ARCHIVE" ] || [ ! -f "$ARCHIVE" ]; then
+  echo "::error::libunicorn archive was not produced" >&2
+  exit 1
+fi
+
 mkdir -p "$ROOT/build/ios"
-cp "$BUILD_DIR/build/libunicorn.a" "$ROOT/build/ios/libunicorn.a"
+cp "$ARCHIVE" "$ROOT/build/ios/libunicorn.a"
+echo "==> using $ARCHIVE"
 
 # purego resolves the statically linked API through dlsym, so the symbols must
 # be exported. The Go build adds these flags via CGO_LDFLAGS.

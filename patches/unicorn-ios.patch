@@ -7,7 +7,7 @@
 -int main() { pthread_jit_write_protect_supported_np(); return 0;}
 +int main() { pthread_jit_write_protect_supported_np(); pthread_jit_write_protect_np(0); return 0;}
  EOF
-   if ! compile_prog "" ; then
+   if ! compile_prog ""; then
      have_pthread_jit_protect='no'
 --- a/src/qemu/include/tcg/tcg-apple-jit.h
 +++ b/src/qemu/include/tcg/tcg-apple-jit.h
