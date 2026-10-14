@@ -1,5 +1,5 @@
---- a/src/qemu/configure
-+++ b/src/qemu/configure
+--- a/qemu/configure
++++ b/qemu/configure
 @@ -2152,7 +2152,7 @@
  if [ "$darwin" = "yes" ] ; then
    cat > $TMPC << EOF
@@ -9,8 +9,8 @@
  EOF
    if ! compile_prog ""; then
      have_pthread_jit_protect='no'
---- a/src/qemu/include/tcg/tcg-apple-jit.h
-+++ b/src/qemu/include/tcg/tcg-apple-jit.h
+--- a/qemu/include/tcg/tcg-apple-jit.h
++++ b/qemu/include/tcg/tcg-apple-jit.h
 @@ -104,13 +104,11 @@
  #endif
  
@@ -29,8 +29,8 @@
  
  #define JIT_CALLBACK_GUARD(x)                       \
  {                                                   \
---- a/src/qemu/accel/tcg/translate-all.c
-+++ b/src/qemu/accel/tcg/translate-all.c
+--- a/qemu/accel/tcg/translate-all.c
++++ b/qemu/accel/tcg/translate-all.c
 @@ -1019,7 +1019,7 @@
  static inline void *alloc_code_gen_buffer(struct uc_struct *uc)
  {
@@ -62,8 +62,8 @@
  static bool tb_exec_is_locked(struct uc_struct *uc)
  {
      return uc->current_executable;
---- a/src/uc.c
-+++ b/src/uc.c
+--- a/uc.c
++++ b/uc.c
 @@ -35,8 +35,7 @@
  static uc_err uc_snapshot(uc_engine *uc);
  static uc_err uc_restore_latest_snapshot(uc_engine *uc);
