@@ -1,0 +1,47 @@
+name: DLiPA
+options:
+  bundleIdPrefix: com.ahmedbafkir
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+
+targets:
+  DLiPA:
+    type: application
+    platform: iOS
+    deploymentTarget: "15.0"
+    supportedDestinations: [iOS]
+    sources:
+      - path: DLiPA
+        excludes:
+          - "**/*.md"
+    dependencies:
+      - framework: Frameworks/SapBridge.framework
+        embed: true
+        codeSignOnCopy: false
+        removeHeaders: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ahmedbafkir.dlipa
+        PRODUCT_NAME: DLiPA
+        INFOPLIST_FILE: DLiPA/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+        ENABLE_BITCODE: NO
+        # Unsigned build: the user signs the IPA with their own Apple ID
+        # via AltStore / Sideloadly, so no team or provisioning profile is
+        # needed at build time.
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
+        DEVELOPMENT_TEAM: ""
+        PROVISIONING_PROFILE_SPECIFIER: ""
+        # Local networking + arbitrary loads for the embedded HTTP server
+        # that serves the itms-services install manifest.
+        NSAppTransportSecurity: ""
+      configs:
+        Release:
+          SWIFT_OPTIMIZATION_LEVEL: "-Owholemodule"

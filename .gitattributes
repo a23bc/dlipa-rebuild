@@ -1,0 +1,10 @@
+# The four Apple SAP binaries total ~119 MB. Track them with LFS.
+VendorAssets/CoreFP filter=lfs diff=lfs merge=lfs -text
+VendorAssets/AppleMediaServices filter=lfs diff=lfs merge=lfs -text
+VendorAssets/commerce filter=lfs diff=lfs merge=lfs -text
+VendorAssets/CoreFP.icxs filter=lfs diff=lfs merge=lfs -text
+
+# Build outputs and the bound framework must never be committed.
+app/DLiPA/Frameworks/SapBridge.framework/ filter=lfs diff=lfs merge=lfs -text
+build/ -text
+*.ipa -text

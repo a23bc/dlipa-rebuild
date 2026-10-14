@@ -1,0 +1,9 @@
+build/
+app/build/
+app/DLiPA/Frameworks/SapBridge.framework/
+*.xcuserstate
+xcuserdata/
+DerivedData/
+.DS_Store
+*.ipa
+!VendorAssets/**

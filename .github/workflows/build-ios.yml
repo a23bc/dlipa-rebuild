@@ -1,0 +1,190 @@
+name: Build iOS IPA
+
+# Builds an UNSIGNED .app and packages it as an .ipa.
+# No Apple Developer account is needed: the user signs the IPA on their own
+# machine with AltStore / Sideloadly using their free Apple ID, exactly as the
+# original DLiPA README instructs.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: Xcode configuration
+        required: false
+        default: Release
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go-bridge:
+    name: Build SAP bridge for iOS
+    runs-on: macos-15
+    outputs:
+      artifact: ${{ steps.pack.outputs.artifact }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Install build tools
+        run: |
+          brew install ldid cmake pkg-config
+
+      - name: Run Go unit tests
+        working-directory: sapbridge
+        run: |
+          go test -count=1 ./...
+
+      - name: Build Unicorn for iOS arm64
+        run: |
+          ./scripts/build-unicorn-ios.sh
+
+      - name: Bind the bridge into an iOS framework
+        working-directory: sapbridge
+        env:
+          CGO_ENABLED: "1"
+          GOOS: ios
+          GOARCH: arm64
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          gomobile init
+          gomobile bind -target=ios -o ../app/DLiPA/Frameworks/SapBridge.framework .
+
+      - name: Pack the framework for the app job
+        id: pack
+        run: |
+          tar -czf sapbridge-ios.tar.gz -C app/DLiPA/Frameworks SapBridge.framework
+          echo "artifact=sapbridge-ios.tar.gz" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sapbridge-ios
+          path: sapbridge-ios.tar.gz
+          retention-days: 5
+
+  app:
+    name: Build unsigned DLiPA app
+    runs-on: macos-15
+    needs: go-bridge
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+
+      - name: Download the SAP bridge
+        uses: actions/download-artifact@v4
+        with:
+          name: sapbridge-ios
+          path: app/DLiPA/Frameworks
+
+      - name: Unpack the framework
+        run: |
+          tar -xzf app/DLiPA/Frameworks/sapbridge-ios.tar.gz -C app/DLiPA/Frameworks
+          ls -la app/DLiPA/Frameworks
+
+      - name: Bundle the Apple SAP assets
+        run: |
+          # The four binaries are ~119 MB and stored with git-lfs.
+          git lfs install
+          git lfs pull
+          ls -la VendorAssets
+          ./scripts/stage-assets.sh app/DLiPA/Resources/SapAssets
+
+      - name: Show build environment
+        run: |
+          xcodebuild -version
+          swift --version
+          go version
+
+      - name: Build the app (unsigned)
+        working-directory: app
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project DLiPA.xcodeproj \
+            -scheme DLiPA \
+            -configuration ${{ github.event.inputs.configuration || 'Release' }} \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            clean build | xcpretty || true
+
+      - name: Locate the built app
+        id: app
+        run: |
+          APP=$(find app/build -name "DLiPA.app" -maxdepth 4 -type d | head -n 1)
+          if [ -z "$APP" ]; then echo "::error::DLiPA.app not found"; exit 1; fi
+          echo "path=$APP" >> "$GITHUB_OUTPUT"
+          du -sh "$APP"
+
+      - name: Package as IPA
+        run: |
+          ./scripts/package-ipa.sh "${{ steps.app.outputs.path }}" DLiPA-unsigned.ipa
+          ls -la DLiPA-unsigned.ipa
+
+      - name: Report IPA contents
+        run: |
+          unzip -l DLiPA-unsigned.ipa | tail -n +2 | head -n 30
+          echo "--- size ---"
+          du -h DLiPA-unsigned.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DLiPA-ipa
+          path: DLiPA-unsigned.ipa
+          retention-days: 30
+          if-no-files-found: error
+
+  release:
+    name: Attach IPA to a release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    needs: app
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: DLiPA-ipa
+          path: dist
+
+      - name: Checksum
+        run: |
+          cd dist
+          sha256sum DLiPA-unsigned.ipa > DLiPA-unsigned.ipa.sha256
+          cat DLiPA-unsigned.ipa.sha256
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/DLiPA-unsigned.ipa
+            dist/DLiPA-unsigned.ipa.sha256
+          body: |
+            ## DLiPA (SAP-adapted build)
+
+            This build adds the App Store request signing that Apple now
+            requires. Install it with your own Apple ID:
+
+            * **AltStore** - open the IPA from the My Apps tab
+            * **Sideloadly** - drag the IPA in and sign in
+
+            Free Apple IDs get a 7-day certificate; re-sign weekly.
+            A paid developer account lasts a year.
