@@ -15,6 +15,10 @@ targets:
       - path: DLiPA
         excludes:
           - "**/*.md"
+      # The four Apple binaries are staged here by scripts/stage-assets.sh
+      # and copied into the app bundle.
+      - path: DLiPA/Resources
+        type: folder
     dependencies:
       - framework: Frameworks/SapBridge.framework
         embed: true

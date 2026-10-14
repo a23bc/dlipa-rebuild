@@ -2,6 +2,7 @@ package sapbridge
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/a23bc/dlipa-rebuild/sapbridge/internal/sap/assets"
@@ -9,23 +10,20 @@ import (
 
 // BundleDir is where the app looks for the four Apple binaries. The iOS app
 // copies them out of its own bundle into Library/Caches on first launch,
-// because assets.Load uses os.UserCacheDir().
+// because the upstream loader uses os.UserCacheDir().
 var BundleDir string
 
 // loadBundle resolves the pinned Apple SAP asset profile.
-func loadBundle() assets.Bundle {
+//
+// It returns an error rather than panicking, so a machine without the assets
+// (CI, a fresh install) gets a clear message instead of a crash.
+func loadBundle() (assets.Bundle, error) {
 	dir := BundleDir
 	if dir == "" {
 		dir = bundleDir
 	}
 	if dir != "" {
-		// The iOS app copies the four files here before first use.
-		return assets.Bundle{
-			AppleMediaServices: mustRead(dir + "/AppleMediaServices"),
-			Commerce:           mustRead(dir + "/commerce"),
-			CoreFP:             mustRead(dir + "/CoreFP"),
-			CoreFPICXS:         mustRead(dir + "/CoreFP.icxs"),
-		}
+		return readBundleDir(dir)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -33,15 +31,51 @@ func loadBundle() assets.Bundle {
 
 	bundle, err := assets.Load(ctx)
 	if err != nil {
-		panic("sapbridge: Apple SAP assets unavailable: " + err.Error())
+		msg := "Apple SAP assets are not present in the cache directory; "
+		msg += "copy the four pinned binaries there or call SetBundleDir: "
+		return assets.Bundle{}, fmt.Errorf("%s%w", msg, err)
 	}
-	return bundle
+	return bundle, nil
 }
 
-func mustRead(path string) []byte {
-	b, err := readFile(path)
-	if err != nil {
-		panic("sapbridge: cannot read " + path + ": " + err.Error())
+// readBundleDir loads the four pinned binaries from an explicit directory.
+func readBundleDir(dir string) (assets.Bundle, error) {
+	read := func(name string) ([]byte, error) {
+		return readFile(dir + "/" + name)
 	}
-	return b
+
+	appleMediaServices, err := read("AppleMediaServices")
+	if err != nil {
+		return assets.Bundle{}, fmt.Errorf("read AppleMediaServices: %w", err)
+	}
+
+	commerce, err := read("commerce")
+	if err != nil {
+		return assets.Bundle{}, fmt.Errorf("read commerce: %w", err)
+	}
+
+	coreFP, err := read("CoreFP")
+	if err != nil {
+		return assets.Bundle{}, fmt.Errorf("read CoreFP: %w", err)
+	}
+
+	coreFPICXS, err := read("CoreFP.icxs")
+	if err != nil {
+		return assets.Bundle{}, fmt.Errorf("read CoreFP.icxs: %w", err)
+	}
+
+	bundle := assets.Bundle{
+		AppleMediaServices: appleMediaServices,
+		Commerce:           commerce,
+		CoreFP:             coreFP,
+		CoreFPICXS:         coreFPICXS,
+	}
+
+	// Reuse the upstream validator so a truncated or tampered file is caught
+	// here, where the error can name what is wrong.
+	if err := assets.Validate(bundle); err != nil {
+		return assets.Bundle{}, err
+	}
+
+	return bundle, nil
 }

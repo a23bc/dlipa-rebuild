@@ -2,6 +2,7 @@ package sapbridge
 
 import (
 	"encoding/base64"
+	"os"
 	"testing"
 )
 
@@ -11,6 +12,11 @@ import (
 //
 //	go test -run TestLiveSAPHandshake -v .
 func TestLiveSAPHandshake(t *testing.T) {
+	// Honour an explicit asset directory so CI can run the live tests.
+	if dir := os.Getenv("DSH_SAP_ASSET_DIR"); dir != "" {
+		BundleDir = dir
+	}
+
 	hardware := []byte{0x02, 0x00, 0x00, 0x00, 0x00, 0x01}
 
 	signer, err := New(

@@ -205,6 +205,13 @@ func replaceFile(path string, data []byte) error {
 	return nil
 }
 
+// Validate checks the four pinned binaries for size and SHA-256.
+// Exported so callers that supply their own asset directory get the same
+// integrity guarantees as the cache reader.
+func Validate(bundle Bundle) error {
+	return validate(bundle)
+}
+
 func validate(bundle Bundle) error {
 	files := bundleFiles(bundle)
 	for _, spec := range requiredFiles {

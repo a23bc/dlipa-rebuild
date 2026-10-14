@@ -107,7 +107,12 @@ func KBSync(hardwareID []byte, dsid uint64) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	return machine.GenerateKBSync(ctx, loadBundle(), hardwareID, dsid)
+	bundle, err := loadBundle()
+	if err != nil {
+		return nil, fmt.Errorf("load Apple SAP assets: %w", err)
+	}
+
+	return machine.GenerateKBSync(ctx, bundle, hardwareID, dsid)
 }
 
 // SerialNumber returns ent/download's serialNumber field:

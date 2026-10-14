@@ -2,6 +2,7 @@ package sapbridge
 
 import (
 	"encoding/base64"
+	"os"
 	"strings"
 	"testing"
 )
@@ -122,5 +123,48 @@ func TestSetBundleDirOverridesGlobal(t *testing.T) {
 	BundleDir = "/tmp/from-global"
 	if got := BundleDirValue(); got != "/tmp/from-global" {
 		t.Fatalf("BundleDirValue = %q, want /tmp/from-global", got)
+	}
+}
+
+// TestKBSyncReturnsErrorWithoutAssets is the regression test for a CI failure:
+// loadBundle used to panic, which crashed the test binary instead of letting
+// the caller report a missing asset.
+func TestKBSyncReturnsErrorWithoutAssets(t *testing.T) {
+	// Point at an empty directory so the loader cannot find the binaries.
+	dir := t.TempDir()
+	previous := BundleDir
+	defer func() { BundleDir = previous }()
+	BundleDir = dir
+
+	_, err := KBSync([]byte{0x02, 0x00, 0x00, 0x00, 0x00, 0x01}, 1234567890)
+	if err == nil {
+		t.Fatal("KBSync succeeded with an empty asset directory")
+	}
+	if strings.Contains(err.Error(), "panic") {
+		t.Fatalf("error mentions a panic: %v", err)
+	}
+}
+
+// TestBundleDirValidationRejectsTruncatedFiles confirms a corrupt asset is
+// reported as an integrity failure rather than an opaque handshake error.
+func TestBundleDirValidationRejectsTruncatedFiles(t *testing.T) {
+	dir := t.TempDir()
+	// Right names, wrong contents: CoreFP must be 94842464 bytes.
+	for _, name := range []string{"AppleMediaServices", "commerce", "CoreFP", "CoreFP.icxs"} {
+		if err := os.WriteFile(dir+"/"+name, []byte("truncated"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	previous := BundleDir
+	defer func() { BundleDir = previous }()
+	BundleDir = dir
+
+	_, err := KBSync([]byte{0x02, 0x00, 0x00, 0x00, 0x00, 0x01}, 1234567890)
+	if err == nil {
+		t.Fatal("KBSync accepted truncated assets")
+	}
+	if !strings.Contains(err.Error(), "size") && !strings.Contains(err.Error(), "integrity") {
+		t.Fatalf("error does not mention size or integrity: %v", err)
 	}
 }
