@@ -1,0 +1,19 @@
+name: Runner probe
+
+on: workflow_dispatch
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "==> ubuntu runner works"
+          uname -a
+          df -h / | tail -1
+
+  linux-arm:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - run: |
+          echo "==> ubuntu arm64 runner works"
+          uname -m
