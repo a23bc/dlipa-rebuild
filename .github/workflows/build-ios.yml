@@ -89,15 +89,27 @@ jobs:
         run: |
           export PATH="$(go env GOPATH)/bin:$PATH"
           # gomobile requires a .xcframework suffix for static frameworks.
-          gomobile bind -target=ios -o ../app/DLiPA/Frameworks/SapBridge.xcframework .
+          gomobile bind -target=ios -ldflags="-Wl,-force_load,${{ github.workspace }}/build/ios/libunicorn.a -Wl,-export_dynamic" -o ../app/DLiPA/Frameworks/SapBridge.xcframework .
           echo "==> framework contents"
           ls -la ../app/DLiPA/Frameworks/
+
+      - name: Inspect the framework
+        run: |
+          # An xcframework nests the real binary under ios-arm64/.
+          find app/DLiPA/Frameworks/SapBridge.xcframework -type f | head -20
+          FRAMEWORK=$(find app/DLiPA/Frameworks/SapBridge.xcframework -name SapBridge -type f | head -n 1)
+          echo "==> binary: $FRAMEWORK"
+          ls -la "$FRAMEWORK"
+          file "$FRAMEWORK"
+          echo "==> does it contain any uc_ symbol?"
+          nm -A "$FRAMEWORK" 2>/dev/null | grep -c uc_ || echo 0
+          echo "==> does it contain purego?"
+          nm -A "$FRAMEWORK" 2>/dev/null | grep -c purego || echo 0
 
       - name: Verify the framework contains Unicorn
         run: |
           # A missing Unicorn backend only shows up as uc_open failing at
           # runtime, which is invisible until the app runs. Check here.
-          # An xcframework nests the real binary under ios-arm64/.
           FRAMEWORK=$(find app/DLiPA/Frameworks/SapBridge.xcframework -name SapBridge -type f | head -n 1)
           if [ -z "$FRAMEWORK" ]; then echo "::error::SapBridge binary not found in the xcframework"; exit 1; fi
           if nm -A "$FRAMEWORK" 2>/dev/null | grep -q uc_open; then
