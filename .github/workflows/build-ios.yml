@@ -70,8 +70,11 @@ jobs:
           GOOS: ios
           GOARCH: arm64
         run: |
+          # go install drops the binary in GOBIN, which is not on PATH by default.
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
           go install golang.org/x/mobile/cmd/gomobile@latest
           gomobile init
+          which gomobile
 
       - name: Bind the bridge into an iOS framework
         working-directory: sapbridge
