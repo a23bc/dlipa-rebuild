@@ -61,6 +61,18 @@ jobs:
         run: |
           sh scripts/build-unicorn-ios.sh
 
+      # gomobile is a host (macOS) tool. It must NOT see the iOS CGO_LDFLAGS,
+      # or the linker rejects the Unicorn archive as the wrong platform.
+      - name: Install gomobile
+        working-directory: sapbridge
+        env:
+          CGO_ENABLED: "1"
+          GOOS: ios
+          GOARCH: arm64
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          gomobile init
+
       - name: Bind the bridge into an iOS framework
         working-directory: sapbridge
         env:
@@ -71,8 +83,6 @@ jobs:
           # resolve them at runtime on iOS.
           CGO_LDFLAGS: -Wl,-force_load,${{ github.workspace }}/build/ios/libunicorn.a -Wl,-export_dynamic
         run: |
-          go install golang.org/x/mobile/cmd/gomobile@latest
-          gomobile init
           gomobile bind -target=ios -o ../app/DLiPA/Frameworks/SapBridge.framework .
           echo "==> framework contents"
           ls -la ../app/DLiPA/Frameworks/SapBridge.framework
