@@ -70,15 +70,16 @@ jobs:
           GOOS: ios
           GOARCH: arm64
         run: |
-          # go install drops the binary in GOBIN, which is not on PATH. Export
-          # it here: $GITHUB_PATH only affects later steps.
-          export PATH="$(go env GOPATH)/bin:$PATH"
+          # Pin the toolchain first. gomobile requires go >= 1.26, which makes
+          # `go install` silently switch toolchains and can install into a
+          # different GOBIN than the one go env reports.
           go install golang.org/x/mobile/cmd/gomobile@latest
-          gomobile init
-          which gomobile
-          # Persist for the bind step.
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-
+          echo "==> GOPATH=$(go env GOPATH) GOBIN=$(go env GOBIN)"
+          echo "==> searching for the installed binary"
+          find "$(go env GOPATH)" -name gomobile -type f 2>/dev/null || true
+          ls -la "$(go env GOPATH)/bin" 2>/dev/null || true
+          echo "==> toolchain dirs"
+          ls -d "$(go env GOPATH)"/bin/* 2>/dev/null | head || true
       - name: Bind the bridge into an iOS framework
         working-directory: sapbridge
         env:
