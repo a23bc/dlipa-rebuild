@@ -2,78 +2,82 @@
 
 ## Bottom line
 
-The private repo, the complete implementation, and the CI configuration are
-done. **The iOS package still cannot be produced**, and the reason is not the
-code:
+**The iOS package still cannot be produced.** GitHub Actions rejects every job
+in 6-8 seconds:
 
     X The job was not started because recent account payments have failed
       or your spending limit needs to be increased.
 
-Every runner tier is blocked, including the free ubuntu ones, so this is an
-account-level billing issue. Jobs are rejected in 6-7 seconds.
+This is account-level billing, not a code problem. All runner tiers are
+blocked, including the free ubuntu ones.
 
 ---
 
-## Progress this round
+## This round: closing the last unverified gap
 
-CI stayed blocked, so the work went into the parts that had never been
-reviewed at all: the Swift app and the localisation data.
+The only item CI never got to confirm was whether Unicorn actually ends up
+inside the framework. Relying on `gomobile -ldflags` alone is fragile: if the
+flag is dropped the archive is silently absent, and the failure appears only
+as a `Dlsym` error on a device, long after CI is green.
 
-### The recovered strings are now actually used
+So there are now two independent mechanisms:
 
-DLiPA 1.4 shipped its `Localizable.strings` as **binary plists**, so they were
-sitting unused. They are now converted to text:
+1. `link_ios.go` carries a cgo preamble with undefined `uc_*` references, so
+   the linker **must** resolve them from the archive.
+2. `-ldflags` force-loads the whole archive and exports its symbols for
+   `purego.Dlsym`.
 
-    14 languages x 120 keys = 1666 strings
+A dropped flag now degrades instead of breaking.
 
-and the UI calls `NSLocalizedString` for every label. Verified: all 17 keys the
-code references resolve in all 14 languages.
+### Verified
 
-### Bugs found by reading the Swift
+File selection is mutually exclusive by build tag, confirmed with `go list`:
 
-The Swift had never been compiled, so this was overdue. Five real bugs:
+    windows cgo=0 -> link_stub.go   (no-op)
+    linux   cgo=0 -> link_stub.go   (no-op)
+    ios     cgo=1 -> link_ios.go    (CgoFiles)
 
-| Bug | Consequence | Fix |
-|---|---|---|
-| `CC_SHA256` with no CommonCrypto import | compile error, CommonCrypto is not importable from Swift | CryptoKit |
-| project.yml never set SWIFT_OBJC_BRIDGING_HEADER | gomobile types unresolvable in Swift | set it |
-| no asset catalog | app ships with no icon | added one from the original icon |
-| redirect kept the body on 303 | HTTP 303 becomes a GET, so re-POSTing is wrong | follow 301/302/307/308 only |
-| assumed Location was absolute | relative Location broke the redirect | resolve against the request URL |
-| numeric failure types shown raw | user sees "2034" instead of a message | map to the ap_* keys |
+`ForceLink` is called from an `init` in the machine package so it cannot be
+dropped as dead code, and it is defined exactly once per platform.
+
+    go build   = 0      go vet = 0
+    go test    = ok     gofmt = clean
+    linux/arm64 cross-compile = 0
+
+### Bug I introduced and caught
+
+While rewriting the bind step I left a YAML line continuation that made
+`gomobile bind ... \` swallow the next line, and dropped a step's
+indentation. `yaml.safe_load` caught it: "expected <block end>, but found
+-'". Fixed and re-validated: 27 steps across 3 jobs.
+
+This is exactly why the workflow is now parsed with a real YAML parser before
+every push.
 
 ---
 
-## What CI proved before it was cut off
-
-From run 38708176362, the last full run:
+## What CI already proved (run 38708176362)
 
 | Stage | Evidence |
 |---|---|
-| LFS pull of the 119 MB assets | pass |
+| LFS pull of 119 MB assets | pass |
 | go test | ok |
-| Unicorn download + sha256 | OK |
-| iOS W^X patch (4 hunks) | applying 4 file sections |
+| Unicorn sha256 | OK |
+| iOS W^X patch, 4 hunks | applying 4 file sections |
 | Unicorn cross-compile | Built target aarch64-softmmu |
 | libunicorn-static.a | linked |
 | gomobile install + init | gomobile ready |
 | gomobile bind | SapBridge.xcframework built |
-| uc_open in the framework | failed; fixed with -ldflags, not yet re-run |
-
-The one unverified item is whether `-ldflags` gets Unicorn into the
-framework. Everything upstream of it is proven.
+| uc_open in framework | failed then; two mechanisms now |
 
 ---
 
 ## To get the IPA
 
-Either unblock Actions at https://github.com/settings/billing and re-run, or
-build on your own Mac - the commands are in the previous report and in
-README.md.
+1. https://github.com/settings/billing - fix the payment method or raise the
+   Actions spending limit from $0
+2. Re-run the workflow
 
-## Repo
+Or build locally on a Mac; the commands are in README.md.
 
-    https://github.com/a23bc/dlipa-rebuild   (private, 20 commits)
-
-Local checks that still pass: `go build`, `go vet`, `go test` (11 tests),
-`gofmt`, and linux/arm64 cross-compile.
+    https://github.com/a23bc/dlipa-rebuild   (private, 22 commits)
