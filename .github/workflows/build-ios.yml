@@ -83,15 +83,20 @@ jobs:
           CGO_ENABLED: "1"
           GOOS: ios
           GOARCH: arm64
-          # Force-load the Unicorn archive and export its symbols so purego can
-          # resolve them at runtime on iOS.
-          CGO_LDFLAGS: -Wl,-force_load,${{ github.workspace }}/build/ios/libunicorn.a -Wl,-export_dynamic
         run: |
           export PATH="$(go env GOPATH)/bin:$PATH"
+          # Unicorn must be force-loaded into the framework, and its symbols
+          # exported so purego can resolve them on iOS. Build the flags in a
+          # variable: gomobile -ldflags takes a single argument, and inline
+          # quoting is easy to get wrong.
+          UNICORN_ARCHIVE="${{ github.workspace }}/build/ios/libunicorn.a"
+          LD="-Wl,-force_load,${UNICORN_ARCHIVE} -Wl,-export_dynamic"
+          echo "==> gomobile -ldflags: $LD"
           # gomobile requires a .xcframework suffix for static frameworks.
-          gomobile bind -target=ios -ldflags="-Wl,-force_load,${{ github.workspace }}/build/ios/libunicorn.a -Wl,-export_dynamic" -o ../app/DLiPA/Frameworks/SapBridge.xcframework .
+          gomobile bind -target=ios -ldflags="$LD" \
+            -o ../app/DLiPA/Frameworks/SapBridge.xcframework .
           echo "==> framework contents"
-          ls -la ../app/DLiPA/Frameworks/
+          ls -laR ../app/DLiPA/Frameworks/ | head -40
 
       - name: Inspect the framework
         run: |
