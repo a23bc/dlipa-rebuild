@@ -88,15 +88,18 @@ jobs:
           CGO_LDFLAGS: -Wl,-force_load,${{ github.workspace }}/build/ios/libunicorn.a -Wl,-export_dynamic
         run: |
           export PATH="$(go env GOPATH)/bin:$PATH"
-          gomobile bind -target=ios -o ../app/DLiPA/Frameworks/SapBridge.framework .
+          # gomobile requires a .xcframework suffix for static frameworks.
+          gomobile bind -target=ios -o ../app/DLiPA/Frameworks/SapBridge.xcframework .
           echo "==> framework contents"
-          ls -la ../app/DLiPA/Frameworks/SapBridge.framework
+          ls -la ../app/DLiPA/Frameworks/
 
       - name: Verify the framework contains Unicorn
         run: |
           # A missing Unicorn backend only shows up as uc_open failing at
           # runtime, which is invisible until the app runs. Check here.
-          FRAMEWORK=app/DLiPA/Frameworks/SapBridge.framework/SapBridge
+          # An xcframework nests the real binary under ios-arm64/.
+          FRAMEWORK=$(find app/DLiPA/Frameworks/SapBridge.xcframework -name SapBridge -type f | head -n 1)
+          if [ -z "$FRAMEWORK" ]; then echo "::error::SapBridge binary not found in the xcframework"; exit 1; fi
           if nm -A "$FRAMEWORK" 2>/dev/null | grep -q uc_open; then
             echo "==> Unicorn symbols present"
           else
@@ -109,7 +112,7 @@ jobs:
       - name: Pack the framework for the app job
         id: pack
         run: |
-          tar -czf sapbridge-ios.tar.gz -C app/DLiPA/Frameworks SapBridge.framework
+          tar -czf sapbridge-ios.tar.gz -C app/DLiPA/Frameworks SapBridge.xcframework
           echo "artifact=sapbridge-ios.tar.gz" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4

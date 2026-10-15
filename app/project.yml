@@ -20,7 +20,7 @@ targets:
       - path: DLiPA/Resources
         type: folder
     dependencies:
-      - framework: Frameworks/SapBridge.framework
+      - framework: Frameworks/SapBridge.xcframework
         embed: true
         codeSignOnCopy: false
         removeHeaders: false
