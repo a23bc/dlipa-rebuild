@@ -64,22 +64,16 @@ jobs:
       # gomobile is a host (macOS) tool. It must NOT see the iOS CGO_LDFLAGS,
       # or the linker rejects the Unicorn archive as the wrong platform.
       - name: Install gomobile
+        # gomobile is a host tool. It must NOT inherit GOOS=ios, or go install
+        # cross-compiles it and drops it in $GOPATH/bin/ios_arm64/gomobile.
+        # It must also not see the iOS CGO_LDFLAGS, or the linker rejects the
+        # Unicorn archive as the wrong platform.
         working-directory: sapbridge
-        env:
-          CGO_ENABLED: "1"
-          GOOS: ios
-          GOARCH: arm64
         run: |
-          # Pin the toolchain first. gomobile requires go >= 1.26, which makes
-          # `go install` silently switch toolchains and can install into a
-          # different GOBIN than the one go env reports.
           go install golang.org/x/mobile/cmd/gomobile@latest
-          echo "==> GOPATH=$(go env GOPATH) GOBIN=$(go env GOBIN)"
-          echo "==> searching for the installed binary"
-          find "$(go env GOPATH)" -name gomobile -type f 2>/dev/null || true
-          ls -la "$(go env GOPATH)/bin" 2>/dev/null || true
-          echo "==> toolchain dirs"
-          ls -d "$(go env GOPATH)"/bin/* 2>/dev/null | head || true
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          gomobile version
+
       - name: Bind the bridge into an iOS framework
         working-directory: sapbridge
         env:
