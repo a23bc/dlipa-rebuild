@@ -13,6 +13,14 @@ import (
 	"github.com/a23bc/dlipa-rebuild/sapbridge/internal/sap/unicorn"
 )
 
+// init forces the Unicorn archive into the link. The cgo shim in the unicorn
+// package carries undefined references to uc_* symbols; without a live
+// reference the linker can drop the archive, and purego.Dlsym then fails on
+// device with an error that never appears in CI.
+func init() {
+	unicorn.ForceLink()
+}
+
 const sapGuestTimeout = time.Minute
 
 const (
