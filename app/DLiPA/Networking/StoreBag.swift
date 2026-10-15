@@ -40,7 +40,7 @@ struct StoreBag {
 
     private static func string(_ value: Any?) -> String? {
         guard let s = value as? String, !s.isEmpty else { return nil }
-        // Accept both the raw and the `loc-` prefixed form.
+        // Accept both the raw and the loc- prefixed form.
         if s.hasPrefix("loc-") { return String(s.dropFirst(4)) }
         return s
     }
@@ -53,18 +53,56 @@ enum StoreError: LocalizedError {
     case httpError(Int, String)
     case failureType(String, String)
 
+    /// User-facing message. Specific detail goes to the log so the alert stays
+    /// short and localised the way the original app does it.
     var errorDescription: String? {
         switch self {
-        case .noBagEndpoint:
-            return "Apple did not advertise a download endpoint."
-        case .malformedBag:
-            return "Apple returned an unreadable configuration."
-        case .signingFailed:
-            return "Failed to sign the request."
+        case .noBagEndpoint, .malformedBag, .signingFailed:
+            return NSLocalizedString("toast_something_wrong", comment: "Generic failure")
         case .httpError(let code, let body):
-            return "Apple returned HTTP \(code): \(body)"
+            let fmt = NSLocalizedString("Apple returned HTTP %d: %@", comment: "HTTP failure")
+            return String(format: fmt, code, body)
         case .failureType(let type, let message):
-            return message.isEmpty ? type : message
+            // Apple reports numeric failure types; the .strings files carry the
+            // named keys, so translate the number first. Unknown values fall
+            // back to the raw type.
+            let key = StoreError.failureKey(for: type)
+            if message.isEmpty {
+                return NSLocalizedString(key, comment: "Apple failure type")
+            }
+            return NSLocalizedString(key, value: message, comment: "Apple failure type with message")
+        }
+    }
+
+    /// Maps Apple numeric failure types to the localisation keys present in the
+    /// .strings files. Mirrors ipatool FailureType constants.
+    static func failureKey(for type: String) -> String {
+        switch type {
+        case "-5000": return "ap_invalid_credentials"
+        case "2034":  return "ap_password_token_expired"
+        case "2042":  return "ap_resignin"
+        case "9610":  return "ap_license_required"
+        case "2059":  return "ap_item_temporarily_unavailable"
+        case "5002":  return "ap_already_have_this_app"
+        case "1008":  return "ap_device_verification_failed"
+        default:      return type
+        }
+    }
+
+    /// Detailed text for the log, not for the alert.
+
+    var detail: String {
+        switch self {
+        case .noBagEndpoint:
+            return "bag did not advertise a download endpoint"
+        case .malformedBag:
+            return "bag could not be parsed"
+        case .signingFailed:
+            return "the request body could not be signed"
+        case .httpError(let code, let body):
+            return "HTTP \(code): \(body.prefix(500))"
+        case .failureType(let type, let message):
+            return type + (message.isEmpty ? "" : ": \(message)")
         }
     }
 }

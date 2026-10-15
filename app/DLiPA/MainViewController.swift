@@ -34,31 +34,31 @@ final class MainViewController: UIViewController {
         stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
 
-        statusLabel.text = "Not signed in"
+        statusLabel.text = NSLocalizedString("ap_signin_first", comment: "Status shown before sign-in")
         statusLabel.font = .preferredFont(forTextStyle: .headline)
         statusLabel.textAlignment = .center
 
-        emailField.placeholder = "Apple ID email"
+        emailField.placeholder = NSLocalizedString("alert_signin_with_appleid", comment: "Apple ID field")
         emailField.borderStyle = .roundedRect
         emailField.autocapitalizationType = .none
         emailField.keyboardType = .emailAddress
 
-        passwordField.placeholder = "Password (append 2FA code)"
+        passwordField.placeholder = NSLocalizedString("alert_password_placeholder", comment: "Password field")
         passwordField.borderStyle = .roundedRect
         passwordField.isSecureTextEntry = true
 
-        codeField.placeholder = "2FA code (optional)"
+        codeField.placeholder = NSLocalizedString("alert_2f_auth_placeholder", comment: "2FA code field")
         codeField.borderStyle = .roundedRect
         codeField.keyboardType = .numberPad
 
-        signInButton.setTitle("Sign in", for: .normal)
+        signInButton.setTitle(NSLocalizedString("alert_sign_in", comment: "Sign in button"), for: .normal)
         signInButton.addTarget(self, action: #selector(signIn), for: .touchUpInside)
 
-        searchField.placeholder = "App name, bundle id, or App Store link"
+        searchField.placeholder = NSLocalizedString("search_placeholder", comment: "Search field")
         searchField.borderStyle = .roundedRect
         searchField.autocapitalizationType = .none
 
-        searchButton.setTitle("Search", for: .normal)
+        searchButton.setTitle(NSLocalizedString("search_title", comment: "Search button"), for: .normal)
         searchButton.addTarget(self, action: #selector(search), for: .touchUpInside)
         searchButton.isEnabled = false
 
@@ -87,7 +87,7 @@ final class MainViewController: UIViewController {
     @objc private func signIn() {
         guard let email = emailField.text, !email.isEmpty,
               let password = passwordField.text, !password.isEmpty else {
-            log("Email and password are required.")
+            log(NSLocalizedString("ap_email_password_required", comment: "Validation error"))
             return
         }
 
@@ -135,7 +135,8 @@ final class MainViewController: UIViewController {
             searchButton.isEnabled = true
             log("Authenticated. DSID \(newAccount.dsid), storefront \(newAccount.storefront)")
         } catch let error as StoreError {
-            log("Sign-in failed: \(error.localizedDescription)")
+            // The alert text is short and localised; the detail goes to the log.
+            log("Sign-in failed: \(error.localizedDescription) [\(error.detail)]")
         } catch {
             log("Sign-in failed: \(error.localizedDescription)")
         }

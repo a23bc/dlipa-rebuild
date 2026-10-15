@@ -1,11 +1,13 @@
+import CryptoKit
 import Foundation
+import UIKit
 
 /// The device identity used for SAP signing and kbsync generation.
 ///
 /// Must be exactly 6 bytes: `ent/download` rejects any other length, and the
 /// original DLiPA used a random UUID which cannot work there.
 struct HardwareIdentity {
-    /// Raw 6 bytes.
+    /// Raw bytes. Must be 6 for `ent/download`.
     let bytes: Data
 
     /// Uppercase hex, e.g. `A4B2C3D4E5F6`. Used as the `guid` query parameter
@@ -17,15 +19,17 @@ struct HardwareIdentity {
     /// A stable 6-byte identity.
     ///
     /// iOS exposes no MAC address, so the first 6 bytes of the vendor
-    /// identifier's SHA-256 are pinned. This is stable across launches, which
+    /// identifier UUID string are used. This is stable across launches, which
     /// matters because a cached kbsync blob is only valid for the identity that
     /// produced it.
     static func stable() -> HardwareIdentity {
+        // identifierForVendor survives app restarts on the same device. It is
+        // reset only when the user removes every app from the vendor, which
+        // also invalidates any cached kbsync - an acceptable trade.
         let seed = UIDevice.current.identifierForVendor?.uuidString ?? "dlipa-fallback"
-        var digest = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
-        seed.data(using: .utf8)!.withUnsafeBytes { pointer in
-            CC_SHA256(pointer.baseAddress, CC_LONG(seed.data(using: .utf8)!.count), &digest)
-        }
+        let data = Data(seed.utf8)
+        // SHA-256 over the UUID string, first 6 bytes kept.
+        let digest = Array(SHA256.hash(data: data))
         return HardwareIdentity(bytes: Data(digest.prefix(6)))
     }
 }

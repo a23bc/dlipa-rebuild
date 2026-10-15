@@ -1,6 +1,8 @@
 name: DLiPA
 options:
   bundleIdPrefix: com.ahmedbafkir
+  # Localizations carried over from the original DLiPA 1.4.
+  knownRegions: ['ar', 'de', 'en', 'es', 'fr', 'hi', 'id', 'it', 'ja', 'ko', 'ru', 'tr', 'vi', 'zh-Hans']
   deploymentTarget:
     iOS: "15.0"
   createIntermediateGroups: true
@@ -15,6 +17,8 @@ targets:
       - path: DLiPA
         excludes:
           - "**/*.md"
+      # App icon and any bundled resources.
+      - path: DLiPA/Assets.xcassets
       # The four Apple binaries are staged here by scripts/stage-assets.sh
       # and copied into the app bundle.
       - path: DLiPA/Resources
@@ -31,6 +35,12 @@ targets:
         INFOPLIST_FILE: DLiPA/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         SWIFT_VERSION: "5.0"
+        # Exposes the gomobile-generated ObjC API to Swift. Without this the
+        # Sapbridge types are unresolvable and the build fails.
+        SWIFT_OBJC_BRIDGING_HEADER: DLiPA/DLiPA-Bridging-Header.h
+        # Headers the framework installs; keep them so the import resolves.
+        ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: YES
+
         TARGETED_DEVICE_FAMILY: "1,2"
         IPHONEOS_DEPLOYMENT_TARGET: "15.0"
         ENABLE_BITCODE: NO

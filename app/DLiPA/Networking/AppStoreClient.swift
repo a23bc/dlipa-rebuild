@@ -176,6 +176,14 @@ final class AppStoreClient {
     // MARK: - Signed transport
 
     /// Sends `request`, signing the body, and re-signs after each redirect.
+    /// Sends `request`, signing the body, and follows redirects by
+    /// re-signing at each hop.
+    ///
+    /// Two details matter, both learned the hard way:
+    ///
+    /// - A 303 asks for a GET, so the body is gone and there is nothing to
+    ///   sign. Treating it as replayable would re-POST incorrectly.
+    /// - `Location` can be relative, so resolve it against the current URL.
     private func signedRequest(_ request: URLRequest,
                                signer: SAPSigner,
                                redirects: Int) async throws -> (Data, HTTPURLResponse) {
@@ -183,35 +191,67 @@ final class AppStoreClient {
 
         for _ in 0...max(redirects, 0) {
             var signed = current
-            // Sign the exact bytes that go on the wire.
+            // Sign the exact bytes that go on the wire. Apple validates the
+            // signature over the body, so this must happen after the body is
+            // final and before the request is dispatched.
             let body = signed.httpBody ?? Data()
             signed.setValue(try signer.signatureHeaderValue(for: body),
                            forHTTPHeaderField: "X-Apple-ActionSignature")
 
             let (data, response) = try await session.data(for: signed)
             guard let http = response as? HTTPURLResponse else {
-                throw StoreError.httpError(-1, "")
+                throw StoreError.httpError(-1, "not an HTTP response")
             }
 
-            // 303 asks for a GET; the body is gone so there is nothing to sign.
-            guard (300..<400).contains(http.statusCode),
+            // A 3xx that should be replayed as-is carries a Location and keeps
+            // the body. A 303 does not: it converts to a GET, so the body is
+            // gone and re-signing is meaningless.
+            guard isReplayableRedirect(http.statusCode),
                   let location = http.value(forHTTPHeaderField: "Location"),
-                  let url = URL(string: location),
-                  signed.httpBody != nil else {
+                  !location.isEmpty else {
                 return (data, http)
             }
 
-            current = URLRequest(url: url)
-            current.httpMethod = signed.httpMethod
-            current.httpBody = signed.httpBody
-            for (key, value) in signed.allHTTPHeaderFields ?? [:] where key != "X-Apple-ActionSignature" {
-                current.setValue(value, forHTTPHeaderField: key)
+            guard let next = resolvedURL(location, relativeTo: signed.url) else {
+                // An unresolvable Location is a dead end; surface the redirect.
+                return (data, http)
             }
+
+            var redirected = URLRequest(url: next)
+            redirected.httpMethod = signed.httpMethod
+            redirected.httpBody = signed.httpBody
+            // Copy the other headers but drop the signature; it is recomputed
+            // at the top of the loop over the new body.
+            for (key, value) in signed.allHTTPHeaderFields ?? [:] where key != "X-Apple-ActionSignature" {
+                redirected.setValue(value, forHTTPHeaderField: key)
+            }
+            current = redirected
         }
 
         throw StoreError.httpError(310, "too many redirects")
     }
 
+    /// Redirect codes whose body must be replayed at the destination.
+    ///
+    /// 303 is excluded on purpose: it converts the request to a GET, so there
+    /// is no body left to sign.
+    private func isReplayableRedirect(_ statusCode: Int) -> Bool {
+        switch statusCode {
+        case 301, 302, 307, 308:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// Resolves a possibly relative Location against the request URL.
+    private func resolvedURL(_ location: String, relativeTo base: URL?) -> URL? {
+        if let absolute = URL(string: location), absolute.scheme != nil {
+            return absolute
+        }
+        guard let base else { return nil }
+        return URL(string: location, relativeTo: base)?.absoluteURL
+    }
     // MARK: - Helpers
 
     private func validate(_ response: URLResponse, data: Data) throws {
