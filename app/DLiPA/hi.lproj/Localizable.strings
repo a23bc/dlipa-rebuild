@@ -119,3 +119,4 @@
 "versions_versions" = "वर्शन";
 "Apple returned HTTP %d: %@" = "Apple ने HTTP %d लौटाया: %@";
 "ap_invalid_credentials" = "ईमेल या पासवर्ड गलत है";
+"assets_ready" = "साइनिंग संसाधन तैयार";

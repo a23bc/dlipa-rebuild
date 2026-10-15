@@ -64,14 +64,50 @@ final class SAPSigner {
     }
 
     /// The FairPlay kbsync blob required by `ent/download`.
+    ///
+    /// Generating a blob spins up the Unicorn guest and the Apple binaries,
+    /// which is expensive, and the blob is stable for a given account and
+    /// device. So it is cached and reused. A blob Apple rejected is
+    /// discarded so the next call regenerates it; a freshly generated blob
+    /// is never retried, because a second failure means something is wrong.
     func kbsync(dsid: String) throws -> Data {
+        let numeric = try Self.parseDSID(dsid)
+        let key = Self.cacheKey(dsid: numeric, guid: hardware.guid)
+
+        if let cached = Self.kbsyncCache.object(forKey: key) {
+            return cached as Data
+        }
+
+        let fresh = try generateKBSync(dsid: numeric)
+        Self.kbsyncCache.setObject(fresh as NSData, forKey: key)
+        return fresh
+    }
+
+    /// Drops a cached blob so the next call regenerates it. Call this when
+    /// Apple rejects a download, which ipatool treats as a stale blob.
+    func invalidateKBSync(dsid: String) {
+        guard let numeric = try? Self.parseDSID(dsid) else { return }
+        Self.kbsyncCache.removeObject(forKey: Self.cacheKey(dsid: numeric, guid: hardware.guid))
+    }
+
+    private func generateKBSync(dsid: Int64) throws -> Data {
         var error: NSError?
         guard let blob = Sapbridge.kbsync(hardware.bytes,
-                                         dsid: try Self.parseDSID(dsid),
+                                         dsid: dsid,
                                          error: &error), error == nil else {
             throw error ?? NSError(domain: "SAPSigner", code: 3, userInfo: nil)
         }
         return blob
+    }
+
+    // MARK: kbsync cache
+
+    /// In-memory only. A blob is bound to an account and a device, and the
+    /// device identity is stable, so there is nothing to persist.
+    private static let kbsyncCache = NSMapTable<NSString, NSData>.strongToStrongObjects()
+
+    private static func cacheKey(dsid: Int64, guid: String) -> NSString {
+        return "\(dsid):\(guid)" as NSString
     }
 
     /// `ent/download`'s serialNumber: base64(54 c8 b0 a9 88 ++ guid[2:]).

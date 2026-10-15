@@ -119,3 +119,4 @@
 "versions_versions" = "Versi";
 "Apple returned HTTP %d: %@" = "Apple mengembalikan HTTP %d: %@";
 "ap_invalid_credentials" = "Email atau kata sandi salah";
+"assets_ready" = "Aset penandatanganan siap";

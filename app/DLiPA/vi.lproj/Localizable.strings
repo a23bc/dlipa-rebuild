@@ -119,3 +119,4 @@
 "versions_versions" = "Phiên bản";
 "Apple returned HTTP %d: %@" = "Apple trả về HTTP %d: %@";
 "ap_invalid_credentials" = "Email hoặc mật khẩu không đúng";
+"assets_ready" = "Tài nguyên ký đã sẵn sàng";

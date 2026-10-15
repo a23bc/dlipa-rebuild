@@ -6,10 +6,14 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions:
                         [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // The four Apple binaries are ~119 MB and live in the app bundle, which
-        // is read-only. assets.Load uses the user cache directory, so copy them
-        // across on first launch and point the bridge at them.
-        AssetStaging.stageIfNeeded()
+        // The four Apple SAP binaries are about 119 MB. Copying them on the
+        // main thread would stall launch, so staging runs in the background
+        // and signing is blocked until it finishes.
+        AssetStaging.stageIfNeeded { error in
+            if let error {
+                print("[assets] staging failed: " + String(describing: error))
+            }
+        }
         return true
     }
 

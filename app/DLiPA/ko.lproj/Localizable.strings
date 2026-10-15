@@ -119,3 +119,4 @@
 "versions_versions" = "버전";
 "Apple returned HTTP %d: %@" = "Apple이 HTTP %d를 반환했습니다: %@";
 "ap_invalid_credentials" = "잘못된 이메일 또는 비밀번호";
+"assets_ready" = "서명 자산 준비 완료";

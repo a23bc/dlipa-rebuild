@@ -160,13 +160,21 @@ final class AppStoreClient {
         let plist = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
             as? [String: Any] ?? [:]
 
+        // A failure on the download leg is often a stale kbsync blob. Drop it
+        // so the next attempt regenerates rather than replaying the rejected
+        // value; ipatool does the same, but only once, and never for a fresh
+        // blob.
         if let failure = plist["failureType"] as? String, !failure.isEmpty {
             let message = plist["customerMessage"] as? String ?? ""
+            if failure == "2034" || failure == "2042" || failure == "1008" {
+                signer.invalidateKBSync(dsid: account.dsid)
+            }
             throw StoreError.failureType(failure, message)
         }
 
-        guard let items = plist["songList"] as? [[String: Any]],
-              let urlString = items.first?["URL"] as? String,
+        guard let items = plist["songList"] as? [Any],
+              let first = items.first as? [String: Any],
+              let urlString = first["URL"] as? String,
               let url = URL(string: urlString) else {
             throw StoreError.failureType("Invalid response", "")
         }
@@ -175,7 +183,6 @@ final class AppStoreClient {
 
     // MARK: - Signed transport
 
-    /// Sends `request`, signing the body, and re-signs after each redirect.
     /// Sends `request`, signing the body, and follows redirects by
     /// re-signing at each hop.
     ///

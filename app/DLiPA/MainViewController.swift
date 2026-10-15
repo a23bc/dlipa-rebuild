@@ -23,7 +23,30 @@ final class MainViewController: UIViewController {
         title = "DLiPA"
         view.backgroundColor = .systemBackground
         buildLayout()
-        log("Ready. Apple SAP assets staged to \(AssetStaging.stagedDirectory.path)")
+        signInButton.isEnabled = false
+
+        // Staging the assets takes a while on a cold start. Report
+        // progress and only allow sign-in once the bridge can sign.
+        var lastBucket = -1
+        AssetStaging.stageIfNeeded(progress: { fraction in
+            let percent = Int((fraction * 100).rounded())
+            let bucket = percent / 10
+            if bucket != lastBucket {
+                lastBucket = bucket
+                print("[assets] " + String(percent) + "%")
+            }
+        }) { error in
+            if let error {
+                self.log("Assets failed to stage: " + error.localizedDescription)
+            } else {
+                let size = ByteCountFormatter.string(
+                    fromByteCount: Int64(AssetStaging.totalBytes), countStyle: .file)
+                self.log(NSLocalizedString("assets_ready", comment: "Assets staged")
+                         + " (" + size + ")")
+            }
+            self.signInButton.isEnabled = true
+        }
+        log("Staging signing assets...")
     }
 
     // MARK: Layout
@@ -88,6 +111,11 @@ final class MainViewController: UIViewController {
         guard let email = emailField.text, !email.isEmpty,
               let password = passwordField.text, !password.isEmpty else {
             log(NSLocalizedString("ap_email_password_required", comment: "Validation error"))
+            return
+        }
+
+        guard AssetStaging.isReady else {
+            log("Waiting for the signing assets to finish staging...")
             return
         }
 

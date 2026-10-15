@@ -119,3 +119,4 @@
 "versions_versions" = "Sürümler";
 "Apple returned HTTP %d: %@" = "Apple HTTP %d döndürdü: %@";
 "ap_invalid_credentials" = "Geçersiz e-posta veya şifre";
+"assets_ready" = "İmza kaynakları hazır";

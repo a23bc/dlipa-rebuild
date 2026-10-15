@@ -119,3 +119,4 @@
 "versions_versions" = "Версии";
 "Apple returned HTTP %d: %@" = "Apple вернул HTTP %d: %@";
 "ap_invalid_credentials" = "Неверная почта или пароль";
+"assets_ready" = "Ресурсы подписи готовы";

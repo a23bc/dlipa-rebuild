@@ -119,3 +119,4 @@
 "versions_versions" = "الإصدارات";
 "Apple returned HTTP %d: %@" = "أعادت Apple HTTP %d: %@";
 "ap_invalid_credentials" = "بريد إلكتروني أو كلمة مرور غير صحيحة";
+"assets_ready" = "أصول التوقيع جاهزة";
