@@ -71,9 +71,12 @@ cmake -S "$SRC_DIR" -B "$BUILD_DIR/build" \
   -DUNICORN_INSTALL=OFF
 cmake --build "$BUILD_DIR/build" --parallel "$(sysctl -n hw.ncpu)"
 
-# With BUILD_SHARED_LIBS=OFF CMake renames the target to unicorn-static, so the
-# archive lands as libunicorn-static.a.
-ARCHIVE="$BUILD_DIR/build/libunicorn-static.a"
+# CMake links two archives: libunicorn-static.a holds only the common target,
+# while libunicorn.a is the full library including the per-arch softmmu
+# objects. Choosing the wrong one leaves uc_open resolvable but the arch
+# helpers undefined, which surfaces as missing reg_write_aarch64 and
+# g_array_new at link time.
+ARCHIVE="$BUILD_DIR/build/libunicorn.a"
 if [ ! -f "$ARCHIVE" ]; then
   ARCHIVE=$(find "$BUILD_DIR/build" -name "libunicorn*.a" | head -n 1)
 fi
