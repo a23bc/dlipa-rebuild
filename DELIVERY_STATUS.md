@@ -1,77 +1,60 @@
-# Delivery status
+# Delivery: DLiPA IPA built
 
-## Bottom line
+**The IPA is built and verified.**
 
-**The iOS package still cannot be produced.** GitHub Actions rejects every
-job in 6-8 seconds:
+    DLiPA-unsigned.ipa    97.37 MB    arm64
+    sha256  9bd3f55fe92254e6a2e7ffca2ab753b038182c7067acbc0404dbcd09990f2673
 
-    X The job was not started because recent account payments have failed
-      or your spending limit needs to be increased.
+Run: https://github.com/a23bc/dlipa-rebuild/actions/runs/38876350947
 
-Account-level billing, not a code problem. All runner tiers are blocked.
+Both jobs green:
 
----
+    Build SAP bridge for iOS      2m33s  pass
+    Build unsigned DLiPA app      1m11s  pass
 
-## This round: two real bugs in the never-reviewed paths
+## What is inside
 
-### 1. 119 MB copy on the main thread
+    Payload/DLiPA.app/DLiPA                    10.38 MB  arm64 Mach-O
+    Payload/DLiPA.app/Frameworks/SapBridge.framework
+    Payload/DLiPA.app/Resources/SapAssets/      119 MB
+        CoreFP              94,842,464
+        AppleMediaServices  14,813,888
+        commerce             8,092,640
+        CoreFP.icxs          7,365,344
+    Payload/DLiPA.app/icon-152.png
+    14 x Localizable.strings
 
-AssetStaging.stageIfNeeded() was called directly from
-didFinishLaunchingWithOptions, so launch would stall for as long as it takes
-to copy 119 MB, and setBundleDir was called even when some files had failed
-to copy. Sign-in then ran against assets that were not all there.
+Unicorn is statically linked into the main binary, which is why it is
+10 MB rather than the few hundred KB the Go code alone would produce.
 
-Now: runs on a utility queue, reports progress in ten-percent buckets, sets
-the bundle directory only after every file is present, and signIn guards on
-isReady.
+## Install it
 
-### 2. kbsync regenerated on every download
+The payload is unsigned on purpose. Sign it with a free Apple ID:
 
-Every download spun up the Unicorn guest and the Apple binaries again, even
-though a blob is stable for a given account and device.
+- **AltStore** - open the IPA from the My Apps tab
+- **Sideloadly** - drag the IPA in and sign in
 
-Now cached per account and device, and dropped when Apple rejects a
-download with 2034, 2042 or 1008 so the next attempt regenerates it.
+Free Apple IDs get a 7-day certificate, so re-sign weekly. A paid developer
+account lasts a year.
 
----
+## Verified locally
 
-## Verification
+    go build = 0    go vet = 0    go test = ok    gofmt = clean
+    zip opens, Payload/ present, binary magic CF FA ED FE (arm64)
+    all four SAP assets present at the path the app loads them from
+    all four asset sizes match the pinned digests
 
-    go build = 0      go vet = 0
-    go test  = 11 PASS / 2 SKIP
-    gofmt    = clean
-    linux/arm64 cross-compile = 0
-    iOS file selection: CgoFiles=[link_ios.go]
+## Bugs found by this run
 
-    all 9 Swift files balance
-    11 localisation keys resolve in all 14 languages
-
-Repo: private, 24 commits, clean tree.
-
----
-
-## What CI already proved (run 38708176362)
-
-| Stage | Evidence |
+| Symptom | Cause |
 |---|---|
-| LFS pull of 119 MB assets | pass |
-| go test | ok |
-| Unicorn sha256 | OK |
-| iOS W^X patch, 4 hunks | applying 4 file sections |
-| Unicorn cross-compile | Built target aarch64-softmmu |
-| libunicorn-static.a | linked |
-| gomobile install + init | gomobile ready |
-| gomobile bind | SapBridge.xcframework built |
-| uc_open in framework | unverified; two link mechanisms now |
+| gomobile builds were failing on the simulator slice | the target was `ios`, which builds every variant; `ios/arm64` builds only the device |
+| `New` and `KBSync` missing from the framework | gobind silently skips functions with `uint32`/`uint64`; changed to `int32` and `string` |
+| Swift calls rejected as extraneous labels | gobind exports package functions as C functions, which carry no argument labels in Swift |
+| `uc_*` undefined in the app link | picked `libunicorn-static.a`, which is only the common target; the full library is `libunicorn.a` |
+| ibtool and actool failures | the runner ships the iOS 18 SDK without the installed platform; both tools probe for runtimes |
+| package-ipa.sh died before zipping | `$ROOT` was never set and `$OLDPWD` is unreliable inside the subshell |
 
----
-
-## To get the IPA
-
-1. https://github.com/settings/billing - fix the payment method or raise the
-   Actions spending limit from $0
-2. Re-run the workflow
-
-Or build locally on a Mac; see README.md.
-
-    https://github.com/a23bc/dlipa-rebuild
+The last one is worth noting: the app itself built successfully two runs
+before the IPA existed, so the packaging script was the only thing standing
+between a green pipeline and a deliverable.
