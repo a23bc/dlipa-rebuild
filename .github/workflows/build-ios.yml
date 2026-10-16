@@ -127,18 +127,20 @@ jobs:
           echo "==> exported uc_ symbols:"
           nm -A "$FRAMEWORK" 2>/dev/null | grep -c " T uc_" || true
 
-      - name: Pack the framework for the app job
+      - name: Pack the bridge for the app job
         id: pack
         run: |
-          # Include libunicorn.a: the app link re-links the framework objects,
-          # so OTHER_LDFLAGS in project.yml needs the same archive. Staged
-          # under one directory because bsdtar cannot mix -C roots.
-          mkdir -p app/DLiPA/Frameworks/ios
-          cp build/ios/libunicorn.a app/DLiPA/Frameworks/ios/
-          tar -czf sapbridge-ios.tar.gz \
-            -C app/DLiPA/Frameworks SapBridge.xcframework ios
+          # Ship both archives the app link needs: the gomobile c-archive that
+          # carries the Sapbridge* symbols, and libunicorn.a. Both are
+          # force-loaded through OTHER_LDFLAGS in project.yml, so the app is a
+          # single executable with no embedded framework.
+          #
+          # One tar root: bsdtar cannot mix -C roots.
+          mkdir -p stage/ios
+          cp build/ios/libunicorn.a stage/ios/
+          cp app/DLiPA/Frameworks/SapBridge.xcframework/ios-arm64/SapBridge.framework/SapBridge stage/SapBridge.a
+          tar -czf sapbridge-ios.tar.gz -C stage ios SapBridge.a
           echo "artifact=sapbridge-ios.tar.gz" >> "$GITHUB_OUTPUT"
-
       - uses: actions/upload-artifact@v4
         with:
           name: sapbridge-ios
@@ -159,24 +161,19 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: sapbridge-ios
-          path: app/DLiPA/Frameworks
+          path: bridge
 
-      - name: Unpack the framework
+      - name: Unpack the bridge
         run: |
-          # project.yml refers to Frameworks/SapBridge.xcframework, and
-          # XcodeGen resolves that against the sources root, which is app/.
-          # Unpack there, not into app/DLiPA.
-          mkdir -p app/Frameworks app/build
-          tar -xzf app/DLiPA/Frameworks/sapbridge-ios.tar.gz -C app/Frameworks
-          # The tarball sits inside the target sources, so leaving it would
-          # copy 6 MB of dead weight into the bundle.
-          rm -f app/DLiPA/Frameworks/sapbridge-ios.tar.gz
-          # project.yml points OTHER_LDFLAGS at $(SRCROOT)/build/ios/, so
-          # move the archive out of the frameworks directory.
+          # The archive goes straight into the link. No framework is
+          # unpacked into the bundle: the gomobile archive is force-loaded
+          # into the app binary, so the bundle stays a single executable
+          # and MobileInstallation has no nested bundle to reject.
           mkdir -p app/build/ios
-          mv app/Frameworks/ios/libunicorn.a app/build/ios/
+          tar -xzf bridge/sapbridge-ios.tar.gz -C bridge
+          mv bridge/ios/libunicorn.a app/build/ios/
+          mv bridge/SapBridge.a app/build/ios/
           ls -la app/build/ios/
-          ls -laR app/Frameworks | head -20
       - name: Bundle the Apple SAP assets
         run: |
           # The four binaries are ~119 MB and stored with git-lfs.
@@ -223,23 +220,6 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
             clean build
-      - name: Repair the embedded framework Info.plist
-        run: |
-          # gomobile writes a framework Info.plist whose CFBundleIdentifier is
-          # just "SapBridge" and whose MinimumOSVersion is 100.0. A bundle
-          # identifier has to be reverse-DNS, and MobileInstallation treats a
-          # bundle containing a malformed nested framework as a System app,
-          # which is the failure TrollStore reports as error 181.
-          FW="app/build/Build/Products/Release-iphoneos/DLiPA.app/Frameworks/SapBridge.framework"
-          if [ ! -f "$FW/Info.plist" ]; then
-            echo "::error::no framework Info.plist at $FW" >&2
-            find app/build -name "Info.plist" -path "*SapBridge*" | head
-            exit 1
-          fi
-          /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.a23bc.dliparebuild.SapBridge" "$FW/Info.plist"
-          /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion 15.0" "$FW/Info.plist"
-          echo "==> repaired framework Info.plist"
-          cat "$FW/Info.plist"
       - name: Locate the built app
         id: app
         run: |

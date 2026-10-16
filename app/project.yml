@@ -27,10 +27,12 @@ targets:
       - path: DLiPA/Resources
         type: folder
     dependencies:
-      - framework: Frameworks/SapBridge.xcframework
-        embed: true
-        codeSignOnCopy: false
-        removeHeaders: false
+      # No framework dependency. The gomobile archive is force-loaded into
+      # the app binary by OTHER_LDFLAGS below, so the symbols resolve at link
+      # time and the bundle stays a single executable. Embedding an
+      # xcframework gave MobileInstallation a nested bundle to validate, which
+      # is what made registration fail with TrollStore error 181.
+
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.a23bc.dliparebuild
@@ -59,10 +61,15 @@ targets:
         # Unicorn is force-loaded into SapBridge at build time, but the app
         # link re-links the framework objects, so it needs the archive too.
         # scripts/build-unicorn-ios.sh leaves it at $(SRCROOT)/build/ios/.
+        # Both archives are force-loaded into the app binary: SapBridge.a
+        # carries the gomobile-generated Sapbridge* symbols, libunicorn.a the
+        # emulator they depend on. Force-loading is what makes the bundle a
+        # single executable, with no Frameworks/ directory for
+        # MobileInstallation to reject at registration.
         OTHER_LDFLAGS:
+          - "-Wl,-force_load,$(SRCROOT)/build/ios/SapBridge.a"
           - "-Wl,-force_load,$(SRCROOT)/build/ios/libunicorn.a"
-          - "-Wl,-export_dynamic"
-        # Local networking + arbitrary loads for the embedded HTTP server
+          - "-Wl,-export_dynamic"        # Local networking + arbitrary loads for the embedded HTTP server
         # that serves the itms-services install manifest.
         NSAppTransportSecurity: ""
       configs:
