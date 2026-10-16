@@ -83,12 +83,16 @@ jobs:
           CGO_ENABLED: "1"
           GOOS: ios
           GOARCH: arm64
-          # cgo reads this directly, so it never passes through the Go
-          # linker and cannot be rejected as an unknown link flag.
-          CGO_LDFLAGS: -Wl,-force_load,${{ github.workspace }}/build/ios/libunicorn.a -Wl,-export_dynamic
         run: |
           export PATH="$(go env GOPATH)/bin:$PATH"
-          echo "==> CGO_LDFLAGS: $CGO_LDFLAGS"
+          # Unicorn must be force-loaded into the framework and its symbols
+          # exported so purego.Dlsym can find them at runtime.
+          #
+          # Recorded with go env -w rather than only the shell environment:
+          # gomobile spawns its own go build, and a value that exists only in
+          # the environment is easy to lose across that boundary.
+          go env -w CGO_LDFLAGS="-Wl,-force_load,${{ github.workspace }}/build/ios/libunicorn.a -Wl,-export_dynamic"
+          echo "==> CGO_LDFLAGS: $(go env CGO_LDFLAGS)"
           # Only the device slice. Simulator targets cannot link an arm64 iOS
           # archive, and gomobile builds every variant of the target.
           gomobile bind -target=ios/arm64 \
