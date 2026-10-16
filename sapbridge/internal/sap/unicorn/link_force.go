@@ -3,8 +3,8 @@
 package unicorn
 
 /*
-#cgo ios LDFLAGS: -Wl,-export_dynamic
-#cgo darwin LDFLAGS: -Wl,-export_dynamic
+#cgo ios LDFLAGS: "-Wl,-export_dynamic"
+#cgo darwin LDFLAGS: "-Wl,-export_dynamic"
 
 // Referencing Unicorn symbols from compiled code forces the linker to pull
 // them out of libunicorn.a. Relying on -force_load alone is fragile: if that
