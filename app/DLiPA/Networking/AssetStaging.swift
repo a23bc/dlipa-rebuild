@@ -102,7 +102,7 @@ enum AssetStaging {
         if error == nil {
             // Only tell the bridge about the directory once every file is
             // there, so a partial set cannot be mistaken for a valid one.
-            Sapbridge.setBundleDir(destination.path)
+            SapbridgeSetBundleDir(destination.path)
             isReady = true
         }
         DispatchQueue.main.async { completion(error) }

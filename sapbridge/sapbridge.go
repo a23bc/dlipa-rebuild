@@ -34,7 +34,7 @@ type Signer struct {
 //	sign-sap-setup       -> setupURL
 //	sign-sap-setup-cert  -> certURL
 //	sign-sap-version     -> version (200 today)
-func New(setupURL, certURL string, version uint32, hardwareID []byte) (*Signer, error) {
+func New(setupURL, certURL string, version int32, hardwareID []byte) (*Signer, error) {
 	if len(hardwareID) == 0 || len(hardwareID) > 20 {
 		return nil, fmt.Errorf("hardware ID must be 1..20 bytes, got %d", len(hardwareID))
 	}
@@ -48,7 +48,7 @@ func New(setupURL, certURL string, version uint32, hardwareID []byte) (*Signer, 
 	inner, err := sap.NewSigner(ctx, sap.Config{
 		SetupURL:       setupURL,
 		CertificateURL: certURL,
-		Version:        version,
+		Version:        uint32(version),
 		HardwareID:     hardwareID,
 	})
 	if err != nil {
@@ -100,10 +100,18 @@ func (s *Signer) Close() error {
 
 // KBSync produces the FairPlay blob required by the bag's ent/download
 // endpoint. dsid must be the account's decimal Directory Services ID.
-func KBSync(hardwareID []byte, dsid uint64) ([]byte, error) {
-	if dsid == 0 {
+func KBSync(hardwareID []byte, dsid string) ([]byte, error) {
+	// The DSID arrives as a string because gobind cannot map uint64 across
+	// the language boundary. Parsing it here keeps the Swift side free of
+	// numeric conversions.
+	numeric, err := strconv.ParseUint(strings.TrimSpace(dsid), 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("dsid must be a decimal number: %w", err)
+	}
+	if numeric == 0 {
 		return nil, errors.New("dsid must be nonzero")
 	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -112,7 +120,7 @@ func KBSync(hardwareID []byte, dsid uint64) ([]byte, error) {
 		return nil, fmt.Errorf("load Apple SAP assets: %w", err)
 	}
 
-	return machine.GenerateKBSync(ctx, bundle, hardwareID, dsid)
+	return machine.GenerateKBSync(ctx, bundle, hardwareID, numeric)
 }
 
 // SerialNumber returns ent/download's serialNumber field:
@@ -138,6 +146,12 @@ func GuidFromHardware(hardwareID []byte) string {
 }
 
 // ParseDSID parses the decimal DSID string the app stores.
-func ParseDSID(value string) (uint64, error) {
-	return strconv.ParseUint(strings.TrimSpace(value), 10, 64)
+func ParseDSID(value string) (int64, error) {
+	// ParseUint returns uint64; gobind supports int64, so narrow deliberately.
+	// A DSID is far below the int64 range, so this cannot overflow in practice.
+	parsed, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return int64(parsed), nil
 }

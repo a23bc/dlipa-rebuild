@@ -42,7 +42,7 @@ func TestGuidFromHardware(t *testing.T) {
 func TestParseDSID(t *testing.T) {
 	for _, tc := range []struct {
 		in   string
-		want uint64
+		want int64
 	}{{"1234567890", 1234567890}, {"0", 0}, {"  42 ", 42}} {
 		got, err := ParseDSID(tc.in)
 		if err != nil {
@@ -62,7 +62,7 @@ func TestParseDSID(t *testing.T) {
 }
 
 func TestKBSyncRejectsZeroDSID(t *testing.T) {
-	if _, err := KBSync([]byte{1}, 0); err == nil {
+	if _, err := KBSync([]byte{1}, "0"); err == nil {
 		t.Fatal("KBSync accepted a zero DSID")
 	}
 }
@@ -136,7 +136,7 @@ func TestKBSyncReturnsErrorWithoutAssets(t *testing.T) {
 	defer func() { BundleDir = previous }()
 	BundleDir = dir
 
-	_, err := KBSync([]byte{0x02, 0x00, 0x00, 0x00, 0x00, 0x01}, 1234567890)
+	_, err := KBSync([]byte{0x02, 0x00, 0x00, 0x00, 0x00, 0x01}, "1234567890")
 	if err == nil {
 		t.Fatal("KBSync succeeded with an empty asset directory")
 	}
@@ -160,7 +160,7 @@ func TestBundleDirValidationRejectsTruncatedFiles(t *testing.T) {
 	defer func() { BundleDir = previous }()
 	BundleDir = dir
 
-	_, err := KBSync([]byte{0x02, 0x00, 0x00, 0x00, 0x00, 0x01}, 1234567890)
+	_, err := KBSync([]byte{0x02, 0x00, 0x00, 0x00, 0x00, 0x01}, "1234567890")
 	if err == nil {
 		t.Fatal("KBSync accepted truncated assets")
 	}

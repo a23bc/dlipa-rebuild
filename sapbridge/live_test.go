@@ -66,7 +66,7 @@ func TestLiveSAPHandshake(t *testing.T) {
 
 // TestLiveKBSync generates a real FairPlay blob through the public API.
 func TestLiveKBSync(t *testing.T) {
-	blob, err := KBSync([]byte{0x02, 0x00, 0x00, 0x00, 0x00, 0x01}, 1234567890)
+	blob, err := KBSync([]byte{0x02, 0x00, 0x00, 0x00, 0x00, 0x01}, "1234567890")
 	if err != nil {
 		t.Skipf("kbsync unavailable (assets): %v", err)
 	}
