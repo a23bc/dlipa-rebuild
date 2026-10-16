@@ -17,8 +17,6 @@ targets:
       - path: DLiPA
         excludes:
           - "**/*.md"
-      # App icon and any bundled resources.
-      - path: DLiPA/Assets.xcassets
       # The four Apple binaries are staged here by scripts/stage-assets.sh
       # and copied into the app bundle.
       - path: DLiPA/Resources

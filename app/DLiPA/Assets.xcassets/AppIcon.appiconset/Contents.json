@@ -3,8 +3,9 @@
     {
       "idiom": "universal",
       "platform": "ios",
-      "size": "1024x1024",
-      "filename": "icon-1024.png"
+      "size": "76x76",
+      "scale": "2x",
+      "filename": "icon-152.png"
     }
   ],
   "info": {
