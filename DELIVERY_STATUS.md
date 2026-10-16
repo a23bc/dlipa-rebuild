@@ -1,60 +1,80 @@
-# Delivery: DLiPA IPA built
+# IPA rebuilt: own bundle id, real logging, iOS 15 floor
 
-**The IPA is built and verified.**
+    DLiPA-unsigned.ipa    91.19 MB    arm64    iOS 15.0
+    bundle id  com.a23bc.dliparebuild
+    sha256     a9d8e98d1f0cff1ae8c5914564d8fbf77e6490ebeed7e0563929fb31e1483b83
+    run        https://github.com/a23bc/dlipa-rebuild/actions/runs/38879672530
 
-    DLiPA-unsigned.ipa    97.37 MB    arm64
-    sha256  9bd3f55fe92254e6a2e7ffca2ab753b038182c7067acbc0404dbcd09990f2673
+Read back out of the shipped Info.plist, not just the project file:
 
-Run: https://github.com/a23bc/dlipa-rebuild/actions/runs/38876350947
+    CFBundleIdentifier          com.a23bc.dliparebuild
+    MinimumOSVersion            15.0
+    CFBundleShortVersionString  1.4.1
+    CFBundleIconFiles           icon-152.png
 
-Both jobs green:
+## 1. Bundle id
 
-    Build SAP bridge for iOS      2m33s  pass
-    Build unsigned DLiPA app      1m11s  pass
+`com.ahmedbafkir.dlipa` -> `com.a23bc.dliparebuild`.
 
-## What is inside
+A shared bundle id makes iOS treat two apps as one, so installing this
+over the original would have replaced it, and vice versa. Now they coexist.
 
-    Payload/DLiPA.app/DLiPA                    10.38 MB  arm64 Mach-O
-    Payload/DLiPA.app/Frameworks/SapBridge.framework
-    Payload/DLiPA.app/Resources/SapAssets/      119 MB
-        CoreFP              94,842,464
-        AppleMediaServices  14,813,888
-        commerce             8,092,640
-        CoreFP.icxs          7,365,344
-    Payload/DLiPA.app/icon-152.png
-    14 x Localizable.strings
+## 2. Logging
 
-Unicorn is statically linked into the main binary, which is why it is
-10 MB rather than the few hundred KB the Go code alone would produce.
+There was none. Everything used `print()`, which writes to stdout - and
+nothing reads stdout once the app is not attached to a debugger. Every
+diagnostic was invisible on a real device.
 
-## Install it
+`AppLog` replaces it:
 
-The payload is unsigned on purpose. Sign it with a free Apple ID:
+- `os.Logger` -> Console.app and
+  `log stream --predicate 'subsystem == "com.a23bc.dliparebuild"'`
+- a bounded 500-entry buffer the on-screen log view reads
+- a Share button that exports the buffer as text, so a failure can be
+  reported without a cable
+- six categories: app, auth, sap, assets, network, download
+- levels debug/info/warn/error; Release drops debug
+- percent signs escaped, because os.Logger takes a format string and would
+  otherwise truncate a URL at the first `%`
 
-- **AltStore** - open the IPA from the My Apps tab
-- **Sideloadly** - drag the IPA in and sign in
+29 call sites at the points that explain failures:
 
-Free Apple IDs get a 7-day certificate, so re-sign weekly. A paid developer
-account lasts a year.
+    what the bag actually carried (SAP version, download endpoint)
+    the authenticate URL chosen and the response
+    every signed request status code
+    403 with whether a signature was attached
+    each redirect followed
+    kbsync generated vs reused from cache, and its size
+    each asset staged, with its byte count
+    sign-in failures with their detail string
 
-## Verified locally
+Zero `print()` remain.
 
-    go build = 0    go vet = 0    go test = ok    gofmt = clean
-    zip opens, Payload/ present, binary magic CF FA ED FE (arm64)
-    all four SAP assets present at the path the app loads them from
-    all four asset sizes match the pinned digests
+## 3. iOS version
 
-## Bugs found by this run
+15.0 everywhere - project.yml, Info.plist, and the Unicorn cross-compile
+flags. Unchanged, and now verified rather than assumed:
 
-| Symptom | Cause |
+| API used | Requires |
 |---|---|
-| gomobile builds were failing on the simulator slice | the target was `ios`, which builds every variant; `ios/arm64` builds only the device |
-| `New` and `KBSync` missing from the framework | gobind silently skips functions with `uint32`/`uint64`; changed to `int32` and `string` |
-| Swift calls rejected as extraneous labels | gobind exports package functions as C functions, which carry no argument labels in Swift |
-| `uc_*` undefined in the app link | picked `libunicorn-static.a`, which is only the common target; the full library is `libunicorn.a` |
-| ibtool and actool failures | the runner ships the iOS 18 SDK without the installed platform; both tools probe for runtimes |
-| package-ipa.sh died before zipping | `$ROOT` was never set and `$OLDPWD` is unreliable inside the subshell |
+| os.Logger | iOS 14 |
+| async/await, CryptoKit | iOS 13 |
+| ISO8601DateFormatter | iOS 10 |
+| UIActivityViewController, ByteCountFormatter | iOS 6 |
 
-The last one is worth noting: the app itself built successfully two runs
-before the IPA existed, so the packaging script was the only thing standing
-between a green pipeline and a deliverable.
+Checked for APIs that would need newer: Observation, NavigationStack,
+Charts, Gauge, the iOS 18 Tab syntax - none present. The floor is 14.0, so
+your iOS 15 test device runs everything.
+
+## One bug in the new code
+
+`Logger.warn` does not exist; the method is `Logger.warning`. Caught by the
+CI Swift compile. The level enum keeps `.warn` at the call site; only the
+dispatch needed the real name.
+
+## Also
+
+The IPA dropped from 97.37 to 91.19 MB: the 6 MB packaging tarball that was
+leaking into the bundle is now deleted after unpacking.
+
+Go module still `go build`, `go vet`, `go test` (11 tests) and `gofmt` clean.
