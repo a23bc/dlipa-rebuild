@@ -1,75 +1,57 @@
-# Install: Assets.car was missing
+# Install: you were testing a stale copy
 
-    DLiPA-unsigned.ipa    91.54 MB
-    sha256  8dbff54870be37d242df23765059f77f99e2b808a5ecf3390e5aee11e64ffac7
-    run     https://github.com/a23bc/dlipa-rebuild/actions/runs/38883733600
+    DLiPA-8e892eac.ipa    91.54 MB
+    sha256  35dc23e7eeb8f503abcff85b8471bcb199a8dccc30c532c466cbee0ac09a5c49
+    run     https://github.com/a23bc/dlipa-rebuild/actions/runs/38885472777
 
-## First: this attempt was identical to the last one
+## The log gave it away
 
-The two logs you sent are byte-for-byte the same apart from timestamps, PIDs
-and UUIDs. Same error 181, same `ApplicationType = System`, same failing
-registration dictionary. So the scene-manifest fix either was not in the IPA
-you tested, or it was not the remaining cause. Either way something was still
-wrong.
+The install line reads:
 
-## The cause: no Assets.car
+    custom, ".../tmp/com.opa334.TrollStore-Inbox/DLiPA-unsigned (2).ipa"
 
-`Failed to add app to icon cache` is what the icon cache service says when it
-has no compiled asset catalog to read. The original bundle ships `Assets.car`
-at 196 KB; ours had none, because deleting the asset catalog was what got the
-Xcode build past actool on the runner.
+The "(2)" is what Safari appends on a second download of the same file. Every
+other line of the log, all 85 of them after normalising timestamps, PIDs and
+UUIDs, was identical to the previous attempt. Same error 181, same
+ApplicationType = System.
 
-That was fixing the build by removing a file the runtime needs. The icon cache
-step runs after signing has already succeeded, which is why ldid and the
-CoreTrust bypass both looked clean right up to the failure.
+The IPA with Assets.car was built and committed at 09:47; your install was at
+18:03. What got installed was very likely an old download rather than the new
+build.
 
-The original file is carried over, the same way the icons and the localisation
-strings were.
+## What changed so this cannot recur
 
-## Verified against the original bundle
+The artifact is now named with a short digest of the binary: DLiPA-8e892eac.ipa.
+Every build has a different name, so a stale download is visible at a glance.
+The package, report, artifact and release steps all use that name.
 
-Comparing the shipped app bundle with the one that installs:
+Before the next attempt, delete the old DLiPA-unsigned*.ipa from Files and from
+the TrollStore inbox, then use the file named DLiPA-8e892eac.
 
-    AppIcon60x60@2x.png      IDENTICAL
-    AppIcon76x76@2x~ipad.png IDENTICAL
-    Assets.car               IDENTICAL
-    PkgInfo                  IDENTICAL
+## The build itself is verified
 
-Still not carried over, because our code does not use them and they are not
-part of installing:
+Every check run against the shipped artifact passes:
 
-    blank_audio.mp3                 300 KB   kept a silent track alive for
-                                             background playback
-    localhost.direct.mobileconfig   profile the original served over its
-                                             local install server
-    localhost.direct.p12             its matching certificate
+    Assets.car                  IDENTICAL to the original
+    AppIcon60x60@2x.png         IDENTICAL
+    AppIcon76x76@2x~ipad.png    IDENTICAL
+    PkgInfo                     IDENTICAL
+    Info.plist install-critical keys   9/9 IDENTICAL
+    executable permission       755, correct
+    bundle id                   com.a23bc.dliparebuild
+    minimum iOS                 15.0
 
-Say the word if you want those too; they belong to the local-install flow,
-which this rebuild does not implement yet.
+## Licensing, as advised
 
-## Licensing
+Agreed with the reasoning: a NOTICE file that only repeated LICENSE was adding
+noise, and MIT does not require one. The parts that were not duplication are
+the third-party attributions, and those now have a name that says what they
+are.
 
-### Why MIT
+    LICENSE                   MIT text, plus a scope note on what it does not cover
+    THIRD_PARTY_LICENSES.md   per-component attribution, markdown so it renders
 
-The protocol code is a trimmed copy of ipatool, which is MIT. Keeping MIT means
-the vendored files stay under the licence they were written under instead of
-being relicensed, and avoids mixing terms across code that cannot be cleanly
-separated from the rest. It is also permissive enough that nobody picking this
-up is restricted, which suits a tool whose purpose is restoring a capability
-the original lost.
-
-### What MIT does not cover, now stated in the file
-
-Most importantly: Unicorn is GPL v2 and is statically linked, so its terms
-travel with the binary. MIT on this repo cannot override that. The Apple
-binaries are Apple copyright, and the resources from the original DLiPA have no
-licence at all.
-
-### NOTICE filename
-
-Renamed NOTICE.md to NOTICE, which is the name GitHub detects (it looks for
-LICENSE, LICENCE, COPYING and NOTICE at the root). The .md extension was doing
-nothing useful, so it is plain text with the markdown stripped.
-
-    LICENSE   MIT, plus why, plus what it does not cover
-    NOTICE    per-component attribution in plain text
+NOTICE is gone. LICENSE keeps one paragraph on why MIT, because a reader will
+actually ask, and one saying Unicorn is GPL v2 and statically linked so its
+terms travel with the binary - the one thing MIT on this repo cannot override.
+README links both.
