@@ -246,7 +246,12 @@ jobs:
           # registration with error 181.
           APP=$(find app/build -name "DLiPA.app" -maxdepth 4 -type d | head -n 1)
           if [ -z "$APP" ]; then echo "::error::DLiPA.app not found"; exit 1; fi
-          : > empty.plist
+          # A real plist, not an empty file: ldid parses the entitlements, and
+          # a zero-byte file makes it fail with errno 22. get-task-allow is what
+          # TrollStore and AltStore both put in, and it is harmless in an adhoc
+          # signature.
+          plutil -create xml1 empty.plist
+          plutil -insert get-task-allow -bool true empty.plist
           ldid -Sempty.plist "$APP/DLiPA"
           ldid -s "$APP"
           rm -f empty.plist
