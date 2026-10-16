@@ -227,35 +227,29 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             DEVELOPMENT_TEAM="" \
             clean build
-      - name: Adhoc-sign the app
-        run: |
-          # Xcode 16 refuses adhoc signing against the iOS 18 SDK, so the build
-          # runs unsigned and the signature is attached here instead.
-          #
-          # codesign on the executable only. Signing the bundle itself makes
-          # codesign walk .lproj directories and fail with "bundle format
-          # unrecognized"; signing the Mach-O inside writes the
-          # LC_CODE_SIGNATURE command, which is what matters, and codesign then
-          # seals the bundle from it.
-          #
-          # This is not cosmetic. Without LC_CODE_SIGNATURE
-          # MobileInstallation types the bundle as System and TrollStore fails
-          # registration with error 181. An adhoc signature needs no developer
-          # account, and AltStore, Sideloadly and TrollStore all re-sign over
-          # it on install.
-          APP=$(find app/build -name "DLiPA.app" -maxdepth 4 -type d | head -n 1)
-          if [ -z "$APP" ]; then echo "::error::DLiPA.app not found"; exit 1; fi
-          codesign --force --sign - --timestamp=none "$APP/DLiPA"
-          echo "==> signature attached to the executable"
-          codesign -dvv "$APP/DLiPA" 2>&1 | head -n 6
-          du -sh "$APP"
-      - name: Locate the built app
+            - name: Locate the built app
         id: app
         run: |
           APP=$(find app/build -name "DLiPA.app" -maxdepth 4 -type d | head -n 1)
           if [ -z "$APP" ]; then echo "::error::DLiPA.app not found"; exit 1; fi
           echo "path=$APP" >> "$GITHUB_OUTPUT"
           du -sh "$APP"
+
+      - name: Check the bundle for stray files
+        run: |
+          # CoreFP.icxs was ending up at the bundle root as well as inside
+          # Resources/SapAssets. The root copy is a leftover from an early
+          # attempt to satisfy a guest-internal relative path, and it is
+          # unnecessary: the Go loader reads the assets from the directory
+          # BundleDir names, which the app sets to Resources/SapAssets. A
+          # 7 MB unrecognised file at the bundle root is exactly the kind of
+          # thing MobileInstallation rejects.
+          APP=$(find app/build -name "DLiPA.app" -maxdepth 4 -type d | head -n 1)
+          echo "==> bundle root before cleanup"
+          ls -la "$APP"
+          find "$APP" -maxdepth 1 -type f ! -name "Info.plist" ! -name "PkgInfo" ! -name "DLiPA" ! -name "Assets.car" ! -name "*.png" -print -delete
+          echo "==> bundle root after cleanup"
+          ls -la "$APP"
 
       - name: Package as IPA
         id: ipa
