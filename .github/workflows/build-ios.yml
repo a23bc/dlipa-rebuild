@@ -168,6 +168,9 @@ jobs:
           # Unpack there, not into app/DLiPA.
           mkdir -p app/Frameworks app/build
           tar -xzf app/DLiPA/Frameworks/sapbridge-ios.tar.gz -C app/Frameworks
+          # The tarball sits inside the target sources, so leaving it would
+          # copy 6 MB of dead weight into the bundle.
+          rm -f app/DLiPA/Frameworks/sapbridge-ios.tar.gz
           # project.yml points OTHER_LDFLAGS at $(SRCROOT)/build/ios/, so
           # move the archive out of the frameworks directory.
           mkdir -p app/build/ios
