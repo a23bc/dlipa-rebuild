@@ -131,10 +131,12 @@ jobs:
         id: pack
         run: |
           # Include libunicorn.a: the app link re-links the framework objects,
-          # so OTHER_LDFLAGS in project.yml needs the same archive.
+          # so OTHER_LDFLAGS in project.yml needs the same archive. Staged
+          # under one directory because bsdtar cannot mix -C roots.
+          mkdir -p app/DLiPA/Frameworks/ios
+          cp build/ios/libunicorn.a app/DLiPA/Frameworks/ios/
           tar -czf sapbridge-ios.tar.gz \
-            -C app/DLiPA/Frameworks SapBridge.xcframework \
-            -C "${{ github.workspace }}/build/ios" --transform "s,^,ios/," libunicorn.a
+            -C app/DLiPA/Frameworks SapBridge.xcframework ios
           echo "artifact=sapbridge-ios.tar.gz" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
@@ -164,13 +166,14 @@ jobs:
           # project.yml refers to Frameworks/SapBridge.xcframework, and
           # XcodeGen resolves that against the sources root, which is app/.
           # Unpack there, not into app/DLiPA.
-          mkdir -p app/Frameworks app/build/ios
+          mkdir -p app/Frameworks app/build
           tar -xzf app/DLiPA/Frameworks/sapbridge-ios.tar.gz -C app/Frameworks
+          # project.yml points OTHER_LDFLAGS at $(SRCROOT)/build/ios/, so
+          # move the archive out of the frameworks directory.
+          mkdir -p app/build/ios
+          mv app/Frameworks/ios/libunicorn.a app/build/ios/
+          ls -la app/build/ios/
           ls -laR app/Frameworks | head -20
-          echo "==> unicorn archive"
-          ls -la app/build/ios/ 2>/dev/null || echo "no archive in tarball"
-
-
       - name: Bundle the Apple SAP assets
         run: |
           # The four binaries are ~119 MB and stored with git-lfs.
