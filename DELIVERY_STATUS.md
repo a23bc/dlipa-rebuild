@@ -1,80 +1,75 @@
-# TrollStore install error 181: fixed
+# Install: Assets.car was missing
 
-    DLiPA-unsigned.ipa    91.20 MB
-    sha256  e124e17762fa35722694d49b1fb559f58a08720b26288dad5d4ead07b2a2d7d5
-    run     https://github.com/a23bc/dlipa-rebuild/actions/runs/38882085068
+    DLiPA-unsigned.ipa    91.54 MB
+    sha256  8dbff54870be37d242df23765059f77f99e2b808a5ecf3390e5aee11e64ffac7
+    run     https://github.com/a23bc/dlipa-rebuild/actions/runs/38883733600
 
-## What the log said
+## First: this attempt was identical to the last one
 
-Not a signing failure. Every step that could fail on code signing
-succeeded:
+The two logs you sent are byte-for-byte the same apart from timestamps, PIDs
+and UUIDs. Same error 181, same `ApplicationType = System`, same failing
+registration dictionary. So the scene-manifest fix either was not in the IPA
+you tested, or it was not the remaining cause. Either way something was still
+wrong.
 
-    ldid exited with status 0            (twice)
-    Applied CoreTrust bypass!            (framework and main binary)
-    ApplicationType = System             <-- this
-    Error: Unable to register .../DLiPA.app
-    trollstorehelper returning 181
+## The cause: no Assets.car
 
-`ApplicationType = System` is the tell. MobileInstallation assigns it when a
-bundle does not look like an application, and then registration fails with
-181. The app icon was never the problem, though it was also wrong.
+`Failed to add app to icon cache` is what the icon cache service says when it
+has no compiled asset catalog to read. The original bundle ships `Assets.car`
+at 196 KB; ours had none, because deleting the asset catalog was what got the
+Xcode build past actool on the runner.
 
-## Cause: an incomplete scene manifest
+That was fixing the build by removing a file the runtime needs. The icon cache
+step runs after signing has already succeeded, which is why ldid and the
+CoreTrust bypass both looked clean right up to the failure.
 
-The app has a `SceneDelegate`, so Info.plist must declare the scene
-configuration that instantiates it. It did not. Diffing our Info.plist
-against the original found four gaps:
+The original file is carried over, the same way the icons and the localisation
+strings were.
 
-| Key | Was |
-|---|---|
-| UIApplicationSceneManifest | absent entirely |
-| CFBundleSupportedPlatforms | absent |
-| CFBundleIcons / ~ipad | a bare CFBundleIconFiles list naming an invented file |
-| UIBackgroundModes | absent |
+## Verified against the original bundle
 
-## Fix, verified in the shipped artifact
+Comparing the shipped app bundle with the one that installs:
 
-All nine install-critical keys are now identical to a build known to install.
-Checked by loading the Info.plist **out of the IPA** and comparing it to the
-original, not by reading the project file:
+    AppIcon60x60@2x.png      IDENTICAL
+    AppIcon76x76@2x~ipad.png IDENTICAL
+    Assets.car               IDENTICAL
+    PkgInfo                  IDENTICAL
 
-    UIApplicationSceneManifest      IDENTICAL
-    CFBundleSupportedPlatforms      IDENTICAL
-    CFBundleIcons                   IDENTICAL
-    CFBundleIcons~ipad              IDENTICAL
-    UIBackgroundModes               IDENTICAL
-    CFBundlePackageType             IDENTICAL
-    LSRequiresIPhoneOS              IDENTICAL
-    UIDeviceFamily                  IDENTICAL
-    CFBundleInfoDictionaryVersion   IDENTICAL
+Still not carried over, because our code does not use them and they are not
+part of installing:
 
-    CFBundleIdentifier  com.a23bc.dliparebuild
-    MinimumOSVersion    15.0
-    SceneDelegate class SceneDelegate
+    blank_audio.mp3                 300 KB   kept a silent track alive for
+                                             background playback
+    localhost.direct.mobileconfig   profile the original served over its
+                                             local install server
+    localhost.direct.p12             its matching certificate
 
-The icon uses the upstream files under their real names rather than anything
-regenerated: `AppIcon60x60@2x.png` (120x120) and `AppIcon76x76@2x~ipad.png`
-(152x152), both present in the shipped bundle.
+Say the word if you want those too; they belong to the local-install flow,
+which this rebuild does not implement yet.
 
 ## Licensing
 
-Added `LICENSE` and `NOTICE.md`.
+### Why MIT
 
-The rebuild's own code is MIT. NOTICE.md records what is not ours:
+The protocol code is a trimmed copy of ipatool, which is MIT. Keeping MIT means
+the vendored files stay under the licence they were written under instead of
+being relicensed, and avoids mixing terms across code that cannot be cleanly
+separated from the rest. It is also permissive enough that nobody picking this
+up is restricted, which suits a tool whose purpose is restoring a capability
+the original lost.
 
-- `sapbridge/internal/sap/` is a trimmed vendored copy of **ipatool v2**
-  (MIT, Majd Alfhaily), including the two-leg handshake, the kbsync blob, the
-  ent/download request shape and the iOS W^X patch
-- **Unicorn** is GPL v2 with a linking exception; fetched at build time, not
-  vendored
-- the four Go dependencies with their licenses: go-macho (MIT), purego
-  (Apache 2.0), howett.net/plist (BSD 2-Clause), x/mobile (BSD 3-Clause)
-- the Apple binaries in `VendorAssets/` are Apple copyright
-- the icon and the 14 Localizable.strings come from the original DLiPA 1.4,
-  whose repository states **no license**. NOTICE says so explicitly rather
-  than implying a license it does not have.
+### What MIT does not cover, now stated in the file
 
-One thing worth flagging: because the original publishes no license, reusing
-its icon and strings is a judgement call, not a clearly granted right. They
-are there so this is a drop-in replacement, and they are easy to replace with
-originals if you would rather not carry them.
+Most importantly: Unicorn is GPL v2 and is statically linked, so its terms
+travel with the binary. MIT on this repo cannot override that. The Apple
+binaries are Apple copyright, and the resources from the original DLiPA have no
+licence at all.
+
+### NOTICE filename
+
+Renamed NOTICE.md to NOTICE, which is the name GitHub detects (it looks for
+LICENSE, LICENCE, COPYING and NOTICE at the root). The .md extension was doing
+nothing useful, so it is plain text with the markdown stripped.
+
+    LICENSE   MIT, plus why, plus what it does not cover
+    NOTICE    per-component attribution in plain text
