@@ -7,7 +7,7 @@ struct StoreBag {
     var authenticateAccount: String?
     var signSapSetup: String?
     var signSapSetupCert: String?
-    var signSapVersion: UInt32 = 0
+    var signSapVersion: Int32 = 0
     /// Apple now serves this as `downloaddispatch.itunes.apple.com/.../ent/download`.
     var volumeStoreDownloadProduct: String?
     var redownloadProduct: String?
@@ -34,7 +34,7 @@ struct StoreBag {
         result.volumeStoreDownloadProduct = string(bag["volumeStoreDownloadProduct"])
         result.redownloadProduct = string(bag["redownloadProduct"])
         result.updateProduct = string(bag["updateProduct"])
-        result.signSapVersion = UInt32(string(bag["sign-sap-version"]) ?? "") ?? 0
+        result.signSapVersion = Int32(string(bag["sign-sap-version"]) ?? "") ?? 0
         return result
     }
 

@@ -38,8 +38,8 @@ final class SAPSigner {
 
     init(setupURL: String, certURL: String, version: Int32, hardware: HardwareIdentity) throws {
         var error: NSError?
-        guard let s = SapbridgeNew(setupURL, certURL: certURL, version: version,
-                                   hardware: hardware.bytes, error: &error), error == nil else {
+        guard let s = SapbridgeNew(setupURL, certURL, version, hardware.bytes, &error),
+            error == nil else {
             throw error ?? NSError(domain: "SAPSigner", code: 1, userInfo: nil)
         }
         self.signer = s
@@ -66,7 +66,7 @@ final class SAPSigner {
             return cached as Data
         }
         var error: NSError?
-        let fresh = SapbridgeKBSync(hardware.bytes, dsid: dsid, error: &error)
+        let fresh = SapbridgeKBSync(hardware.bytes, dsid, &error)
         if let error { throw error }
         Self.kbsyncCache.setObject(fresh as NSData, forKey: key)
         return fresh
@@ -80,14 +80,14 @@ final class SAPSigner {
     /// ent/download serialNumber: base64(54 c8 b0 a9 88 ++ guid[2:]).
     func serialNumber() throws -> String {
         var error: NSError?
-        let value = SapbridgeSerialNumber(hardware.bytes, error: &error)
+        let value = SapbridgeSerialNumber(hardware.bytes, &error)
         if let error { throw error }
         return value
     }
 
     func close() {
         var error: NSError?
-        signer.close(&error)
+        signer.perform(Selector(("close:")), with: &error)
         if let error {
             print("[sap] close failed: " + error.localizedDescription)
         }
