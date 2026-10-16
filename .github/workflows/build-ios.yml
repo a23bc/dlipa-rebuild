@@ -164,15 +164,25 @@ jobs:
           ls -la VendorAssets
           ./scripts/stage-assets.sh "$GITHUB_WORKSPACE/VendorAssets" "$GITHUB_WORKSPACE/app/DLiPA/Resources/SapAssets"
 
+      - name: Install xcodegen
+        run: |
+          # project.yml is the source of truth; xcodegen turns it into a real
+          # .xcodeproj so there is no fragile hand-edited pbxproj.
+          brew install xcodegen
+          xcodegen --version
+
       - name: Show build environment
         run: |
           xcodebuild -version
           swift --version
-          go version
 
       - name: Build the app (unsigned)
         working-directory: app
         run: |
+          # Generate the project from project.yml; there is no checked-in
+          # pbxproj to go stale.
+          xcodegen generate
+          ls -la DLiPA.xcodeproj
           set -o pipefail
           xcodebuild \
             -project DLiPA.xcodeproj \
@@ -185,7 +195,9 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
-            clean build | xcpretty || true
+            # No xcpretty here: it is not installed, and "|| true" would mask a
+          # real build failure as success.
+          clean build
 
       - name: Locate the built app
         id: app
