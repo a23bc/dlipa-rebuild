@@ -49,13 +49,15 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         IPHONEOS_DEPLOYMENT_TARGET: "15.0"
         ENABLE_BITCODE: NO
-        # Unsigned build: the user signs the IPA with their own Apple ID
-        # via AltStore / Sideloadly, so no team or provisioning profile is
-        # needed at build time.
+        # Adhoc signing. The binary must carry an LC_CODE_SIGNATURE load
+        # command or MobileInstallation types it as System and TrollStore
+        # fails with error 181, so signing is allowed but with the "-"
+        # adhoc identity. No team and no provisioning profile are needed;
+        # the user re-signs with their own Apple ID on install.
         CODE_SIGN_STYLE: Manual
-        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_ALLOWED: YES
         CODE_SIGNING_REQUIRED: NO
-        CODE_SIGN_IDENTITY: ""
+        CODE_SIGN_IDENTITY: "-"
         DEVELOPMENT_TEAM: ""
         PROVISIONING_PROFILE_SPECIFIER: ""
         # Unicorn is force-loaded into SapBridge at build time, but the app

@@ -208,6 +208,12 @@ jobs:
           #
           # No xcpretty either: it is not installed, and "|| true" would mask
           # a real build failure as success.
+          # Adhoc-sign rather than skipping signing. CODE_SIGNING_ALLOWED=NO
+          # leaves the binary with no LC_CODE_SIGNATURE load command at all,
+          # and MobileInstallation then types the bundle as System and rejects
+          # registration with error 181. The "-" identity produces an adhoc
+          # signature, which is what TrollStore and AltStore expect, and needs
+          # no developer account.
           set -o pipefail
           xcodebuild \
             -project DLiPA.xcodeproj \
@@ -215,9 +221,9 @@ jobs:
             -configuration ${{ github.event.inputs.configuration || 'Release' }} \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_ALLOWED=YES \
             DEVELOPMENT_TEAM="" \
             clean build
       - name: Locate the built app
