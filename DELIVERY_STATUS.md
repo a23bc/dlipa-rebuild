@@ -1,80 +1,80 @@
-# IPA rebuilt: own bundle id, real logging, iOS 15 floor
+# TrollStore install error 181: fixed
 
-    DLiPA-unsigned.ipa    91.19 MB    arm64    iOS 15.0
-    bundle id  com.a23bc.dliparebuild
-    sha256     a9d8e98d1f0cff1ae8c5914564d8fbf77e6490ebeed7e0563929fb31e1483b83
-    run        https://github.com/a23bc/dlipa-rebuild/actions/runs/38879672530
+    DLiPA-unsigned.ipa    91.20 MB
+    sha256  e124e17762fa35722694d49b1fb559f58a08720b26288dad5d4ead07b2a2d7d5
+    run     https://github.com/a23bc/dlipa-rebuild/actions/runs/38882085068
 
-Read back out of the shipped Info.plist, not just the project file:
+## What the log said
 
-    CFBundleIdentifier          com.a23bc.dliparebuild
-    MinimumOSVersion            15.0
-    CFBundleShortVersionString  1.4.1
-    CFBundleIconFiles           icon-152.png
+Not a signing failure. Every step that could fail on code signing
+succeeded:
 
-## 1. Bundle id
+    ldid exited with status 0            (twice)
+    Applied CoreTrust bypass!            (framework and main binary)
+    ApplicationType = System             <-- this
+    Error: Unable to register .../DLiPA.app
+    trollstorehelper returning 181
 
-`com.ahmedbafkir.dlipa` -> `com.a23bc.dliparebuild`.
+`ApplicationType = System` is the tell. MobileInstallation assigns it when a
+bundle does not look like an application, and then registration fails with
+181. The app icon was never the problem, though it was also wrong.
 
-A shared bundle id makes iOS treat two apps as one, so installing this
-over the original would have replaced it, and vice versa. Now they coexist.
+## Cause: an incomplete scene manifest
 
-## 2. Logging
+The app has a `SceneDelegate`, so Info.plist must declare the scene
+configuration that instantiates it. It did not. Diffing our Info.plist
+against the original found four gaps:
 
-There was none. Everything used `print()`, which writes to stdout - and
-nothing reads stdout once the app is not attached to a debugger. Every
-diagnostic was invisible on a real device.
-
-`AppLog` replaces it:
-
-- `os.Logger` -> Console.app and
-  `log stream --predicate 'subsystem == "com.a23bc.dliparebuild"'`
-- a bounded 500-entry buffer the on-screen log view reads
-- a Share button that exports the buffer as text, so a failure can be
-  reported without a cable
-- six categories: app, auth, sap, assets, network, download
-- levels debug/info/warn/error; Release drops debug
-- percent signs escaped, because os.Logger takes a format string and would
-  otherwise truncate a URL at the first `%`
-
-29 call sites at the points that explain failures:
-
-    what the bag actually carried (SAP version, download endpoint)
-    the authenticate URL chosen and the response
-    every signed request status code
-    403 with whether a signature was attached
-    each redirect followed
-    kbsync generated vs reused from cache, and its size
-    each asset staged, with its byte count
-    sign-in failures with their detail string
-
-Zero `print()` remain.
-
-## 3. iOS version
-
-15.0 everywhere - project.yml, Info.plist, and the Unicorn cross-compile
-flags. Unchanged, and now verified rather than assumed:
-
-| API used | Requires |
+| Key | Was |
 |---|---|
-| os.Logger | iOS 14 |
-| async/await, CryptoKit | iOS 13 |
-| ISO8601DateFormatter | iOS 10 |
-| UIActivityViewController, ByteCountFormatter | iOS 6 |
+| UIApplicationSceneManifest | absent entirely |
+| CFBundleSupportedPlatforms | absent |
+| CFBundleIcons / ~ipad | a bare CFBundleIconFiles list naming an invented file |
+| UIBackgroundModes | absent |
 
-Checked for APIs that would need newer: Observation, NavigationStack,
-Charts, Gauge, the iOS 18 Tab syntax - none present. The floor is 14.0, so
-your iOS 15 test device runs everything.
+## Fix, verified in the shipped artifact
 
-## One bug in the new code
+All nine install-critical keys are now identical to a build known to install.
+Checked by loading the Info.plist **out of the IPA** and comparing it to the
+original, not by reading the project file:
 
-`Logger.warn` does not exist; the method is `Logger.warning`. Caught by the
-CI Swift compile. The level enum keeps `.warn` at the call site; only the
-dispatch needed the real name.
+    UIApplicationSceneManifest      IDENTICAL
+    CFBundleSupportedPlatforms      IDENTICAL
+    CFBundleIcons                   IDENTICAL
+    CFBundleIcons~ipad              IDENTICAL
+    UIBackgroundModes               IDENTICAL
+    CFBundlePackageType             IDENTICAL
+    LSRequiresIPhoneOS              IDENTICAL
+    UIDeviceFamily                  IDENTICAL
+    CFBundleInfoDictionaryVersion   IDENTICAL
 
-## Also
+    CFBundleIdentifier  com.a23bc.dliparebuild
+    MinimumOSVersion    15.0
+    SceneDelegate class SceneDelegate
 
-The IPA dropped from 97.37 to 91.19 MB: the 6 MB packaging tarball that was
-leaking into the bundle is now deleted after unpacking.
+The icon uses the upstream files under their real names rather than anything
+regenerated: `AppIcon60x60@2x.png` (120x120) and `AppIcon76x76@2x~ipad.png`
+(152x152), both present in the shipped bundle.
 
-Go module still `go build`, `go vet`, `go test` (11 tests) and `gofmt` clean.
+## Licensing
+
+Added `LICENSE` and `NOTICE.md`.
+
+The rebuild's own code is MIT. NOTICE.md records what is not ours:
+
+- `sapbridge/internal/sap/` is a trimmed vendored copy of **ipatool v2**
+  (MIT, Majd Alfhaily), including the two-leg handshake, the kbsync blob, the
+  ent/download request shape and the iOS W^X patch
+- **Unicorn** is GPL v2 with a linking exception; fetched at build time, not
+  vendored
+- the four Go dependencies with their licenses: go-macho (MIT), purego
+  (Apache 2.0), howett.net/plist (BSD 2-Clause), x/mobile (BSD 3-Clause)
+- the Apple binaries in `VendorAssets/` are Apple copyright
+- the icon and the 14 Localizable.strings come from the original DLiPA 1.4,
+  whose repository states **no license**. NOTICE says so explicitly rather
+  than implying a license it does not have.
+
+One thing worth flagging: because the original publishes no license, reusing
+its icon and strings is a judgement call, not a clearly granted right. They
+are there so this is a drop-in replacement, and they are easy to replace with
+originals if you would rather not carry them.
