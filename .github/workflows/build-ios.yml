@@ -234,7 +234,11 @@ jobs:
           #
           # ldid rather than codesign: codesign rejects the .lproj directories as
           # "bundle format unrecognized", while ldid seals the executable and
-          # derives the bundle signature. ldid is also what TrollStore runs.
+          # derives the bundle signature. ldid is also what TrollStore itself
+          # runs, in this same order.
+          #
+          # Two calls because -S takes one executable while -s walks the bundle.
+          # Passing a directory to -S aborts on an assert.
           #
           # The signature is not cosmetic: it is what writes the
           # LC_CODE_SIGNATURE load command, and without that command
@@ -243,9 +247,10 @@ jobs:
           APP=$(find app/build -name "DLiPA.app" -maxdepth 4 -type d | head -n 1)
           if [ -z "$APP" ]; then echo "::error::DLiPA.app not found"; exit 1; fi
           : > empty.plist
-          ldid -Sempty.plist "$APP"
+          ldid -Sempty.plist "$APP/DLiPA"
+          ldid -s "$APP"
           rm -f empty.plist
-          echo "==> ldid signed the app"
+          echo "==> ldid signed the executable and the bundle"
           du -sh "$APP"
       - name: Locate the built app
         id: app
