@@ -31,6 +31,11 @@
 	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<!-- Icon copied into the bundle; no asset catalog, so actool never runs. -->
+	<key>CFBundleIconFiles</key>
+	<array>
+		<string>icon-152.png</string>
+	</array>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>arm64</string>

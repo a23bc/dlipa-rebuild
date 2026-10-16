@@ -20,6 +20,8 @@ targets:
           # which is not present. The launch screen comes from Info.plist.
           - "**/*.md"
           - "LaunchScreen.storyboard"
+          # actool wants a simulator runtime the runner does not have.
+          - "Assets.xcassets"
       # The four Apple binaries are staged here by scripts/stage-assets.sh
       # and copied into the app bundle.
       - path: DLiPA/Resources
