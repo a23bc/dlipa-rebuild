@@ -1,9 +1,9 @@
 #!/bin/sh
-# Package an adhoc-signed .app as an installable .ipa.
+# Package an unsigned .app as an installable .ipa.
 #
-# The IPA format is a zip whose root contains Payload/. AltStore, Sideloadly
-# and TrollStore all accept an adhoc-signed payload; the user re-signs it with
-# their own Apple ID.
+# The IPA format is a zip whose root contains Payload/. AltStore, Sideloadly and
+# TrollStore all accept an unsigned payload; the signature is applied on the
+# device when the user signs in.
 set -eu
 
 APP=${1:?usage: package-ipa.sh <path-to-.app> <output.ipa>}
@@ -20,17 +20,9 @@ trap 'rm -rf "$WORK"' EXIT HUP INT TERM
 mkdir -p "$WORK/Payload"
 cp -R "$APP" "$WORK/Payload/"
 
-# _CodeSignature is kept, not stripped. The adhoc signature is what gives the
-# binary its LC_CODE_SIGNATURE load command, and removing it makes
-# MobileInstallation type the bundle as System and fail registration with
-# error 181.
-if [ ! -d "$WORK/Payload"/*.app/_CodeSignature ]; then
-  echo "::error::no _CodeSignature in $APP; the build must adhoc-sign" >&2
-  exit 1
-fi
-echo "==> signature present:"
-ls -la "$WORK/Payload"/*.app/_CodeSignature
-
+# No signature is added or removed. The apps that install under TrollStore are
+# packaged exactly this way: build unsigned, zip Payload. The signature is
+# applied on the device.
 # iTunesArtwork is optional but some tools look for it.
 if [ -f "$APP/iTunesArtwork" ]; then
   cp "$APP/iTunesArtwork" "$WORK/"
