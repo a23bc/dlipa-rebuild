@@ -120,3 +120,5 @@
 "Apple returned HTTP %d: %@" = "Apple 返回 HTTP %d: %@";
 "ap_invalid_credentials" = "邮箱或密码不正确";
 "assets_ready" = "签名资源已就绪";
+"log_share" = "分享日志";
+"log_empty" = "暂无内容可分享";

@@ -120,3 +120,5 @@
 "Apple returned HTTP %d: %@" = "Apple ने HTTP %d लौटाया: %@";
 "ap_invalid_credentials" = "ईमेल या पासवर्ड गलत है";
 "assets_ready" = "साइनिंग संसाधन तैयार";
+"log_share" = "लॉग साझा करें";
+"log_empty" = "अभी साझा करने के लिए कुछ नहीं";

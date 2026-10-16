@@ -120,3 +120,5 @@
 "Apple returned HTTP %d: %@" = "Apple вернул HTTP %d: %@";
 "ap_invalid_credentials" = "Неверная почта или пароль";
 "assets_ready" = "Ресурсы подписи готовы";
+"log_share" = "Поделиться журналом";
+"log_empty" = "Пока нечего отправлять";

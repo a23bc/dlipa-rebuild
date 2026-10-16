@@ -1,6 +1,6 @@
 name: DLiPA
 options:
-  bundleIdPrefix: com.ahmedbafkir
+  bundleIdPrefix: com.a23bc
   # Localizations carried over from the original DLiPA 1.4.
   knownRegions: ['ar', 'de', 'en', 'es', 'fr', 'hi', 'id', 'it', 'ja', 'ko', 'ru', 'tr', 'vi', 'zh-Hans']
   deploymentTarget:
@@ -33,7 +33,7 @@ targets:
         removeHeaders: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.ahmedbafkir.dlipa
+        PRODUCT_BUNDLE_IDENTIFIER: com.a23bc.dliparebuild
         PRODUCT_NAME: DLiPA
         INFOPLIST_FILE: DLiPA/Info.plist
         GENERATE_INFOPLIST_FILE: NO

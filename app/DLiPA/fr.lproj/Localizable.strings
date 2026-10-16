@@ -120,3 +120,5 @@
 "Apple returned HTTP %d: %@" = "Apple a renvoyé HTTP %d : %@";
 "ap_invalid_credentials" = "E-mail ou mot de passe invalide";
 "assets_ready" = "Ressources de signature prêtes";
+"log_share" = "Partager le journal";
+"log_empty" = "Rien a partager pour le moment";

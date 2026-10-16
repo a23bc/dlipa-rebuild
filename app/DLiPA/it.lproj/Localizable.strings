@@ -120,3 +120,5 @@
 "Apple returned HTTP %d: %@" = "Apple ha restituito HTTP %d: %@";
 "ap_invalid_credentials" = "Email o password non validi";
 "assets_ready" = "Risorse di firma pronte";
+"log_share" = "Condividi registro";
+"log_empty" = "Niente da condividere";

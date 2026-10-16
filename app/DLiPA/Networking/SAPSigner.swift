@@ -44,6 +44,7 @@ final class SAPSigner {
         }
         self.signer = s
         self.hardware = hardware
+        AppLog.info("SAP signer ready, hardware " + hardware.guid, .sap)
     }
 
     /// The value for the X-Apple-ActionSignature header.
@@ -65,10 +66,18 @@ final class SAPSigner {
         if let cached = Self.kbsyncCache.object(forKey: key) {
             return cached as Data
         }
+        if let cached = Self.kbsyncCache.object(forKey: key) {
+            AppLog.debug("kbsync reused from cache", .sap)
+            return cached as Data
+        }
         var error: NSError?
+        // Generating the blob runs the Unicorn guest and the Apple binaries,
+        // so a failure here is worth naming precisely.
         guard let fresh = SapbridgeKBSync(hardware.bytes, dsid, &error) else {
+            AppLog.error("kbsync generation failed: " + (error?.localizedDescription ?? "unknown"), .sap)
             throw error ?? NSError(domain: "SAPSigner", code: 3, userInfo: nil)
         }
+        AppLog.info("kbsync generated, " + String(fresh.count) + " bytes", .sap)
         Self.kbsyncCache.setObject(fresh as NSData, forKey: key)
         return fresh
     }
@@ -90,7 +99,7 @@ final class SAPSigner {
         var error: NSError?
         _ = signer.perform(Selector(("close:")), with: error)
         if let error {
-            print("[sap] close failed: " + error.localizedDescription)
+            AppLog.error("close failed: " + error.localizedDescription, .sap)
         }
     }
 

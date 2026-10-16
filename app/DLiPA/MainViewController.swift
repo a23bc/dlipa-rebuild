@@ -17,6 +17,7 @@ final class MainViewController: UIViewController {
     private let signInButton = UIButton(type: .system)
     private let searchButton = UIButton(type: .system)
     private let logView = UITextView()
+    private let shareLogButton = UIButton(type: .system)
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -33,7 +34,7 @@ final class MainViewController: UIViewController {
             let bucket = percent / 10
             if bucket != lastBucket {
                 lastBucket = bucket
-                print("[assets] " + String(percent) + "%")
+                AppLog.debug("staging " + String(percent) + "%", .assets)
             }
         }) { error in
             if let error {
@@ -47,6 +48,14 @@ final class MainViewController: UIViewController {
             self.signInButton.isEnabled = true
         }
         log("Staging signing assets...")
+        AppLog.onUpdate { entries in
+            // The view controller owns logView, so the update has to be
+            // re-armed after a rotation. Re-reading the buffer each time
+            // keeps it simple and the cost is bounded at 500 entries.
+            self.logView.text = entries.map { $0.plainText }.joined(separator: "\n")
+            let bottom = NSMakeRange(self.logView.text.count - 1, 1)
+            self.logView.scrollRangeToVisible(bottom)
+        }
     }
 
     // MARK: Layout
@@ -85,13 +94,14 @@ final class MainViewController: UIViewController {
         searchButton.addTarget(self, action: #selector(search), for: .touchUpInside)
         searchButton.isEnabled = false
 
+        shareLogButton.setTitle(NSLocalizedString("log_share", comment: "Share the log"), for: .normal)
         logView.isEditable = false
         logView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
         logView.layer.borderWidth = 1
         logView.layer.borderColor = UIColor.separator.cgColor
 
         for view in [statusLabel, emailField, passwordField, codeField,
-                     signInButton, searchField, searchButton, logView] {
+                     shareLogButton, signInButton, searchField, searchButton, logView] {
             stack.addArrangedSubview(view)
         }
 
@@ -116,6 +126,7 @@ final class MainViewController: UIViewController {
 
         guard AssetStaging.isReady else {
             log("Waiting for the signing assets to finish staging...")
+            AppLog.info("sign-in attempted before staging finished", .app)
             return
         }
 
@@ -164,9 +175,11 @@ final class MainViewController: UIViewController {
             log("Authenticated. DSID \(newAccount.dsid), storefront \(newAccount.storefront)")
         } catch let error as StoreError {
             // The alert text is short and localised; the detail goes to the log.
-            log("Sign-in failed: \(error.localizedDescription) [\(error.detail)]")
+            AppLog.error("sign-in failed: " + error.localizedDescription + " [" + error.detail + "]", .auth)
+            log("Sign-in failed: " + error.localizedDescription)
         } catch {
-            log("Sign-in failed: \(error.localizedDescription)")
+            AppLog.error("sign-in failed: " + error.localizedDescription, .auth)
+            log("Sign-in failed: " + error.localizedDescription)
         }
     }
 
@@ -194,16 +207,36 @@ final class MainViewController: UIViewController {
         }
     }
 
+    // MARK: - Share log
+
+    /// Puts the in-app log in a share sheet, which is the only way a user
+    /// can send it back without a cable attached to Console.app.
+    @objc private func shareLog() {
+        let text = AppLog.exportText()
+        guard !text.isEmpty else {
+            log(NSLocalizedString("log_empty", comment: "Nothing to share yet"))
+            return
+        }
+        let sheet = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+        if let pop = sheet.popoverPresentationController {
+            pop.sourceView = shareLogButton
+            pop.sourceRect = shareLogButton.bounds
+        }
+        present(sheet, animated: true)
+    }
+
     // MARK: Logging
 
-    private func log(_ message: String) {
-        let stamp = DateFormatter.localizedString(from: Date(),
-                                                 dateStyle: .none,
-                                                 timeStyle: .medium)
-        DispatchQueue.main.async {
-            self.logView.text += "[\(stamp)] \(message)\n"
-            let bottom = NSMakeRange(self.logView.text.count - 1, 1)
-            self.logView.scrollRangeToVisible(bottom)
+    /// UI status line. The same text goes to AppLog so it lands in Console
+    /// and in the shareable log, not just on screen.
+    private func log(_ message: String, level: AppLog.Level = .info,
+                    category: AppLog.Category = .app) {
+        switch level {
+        case .debug: AppLog.debug(message, category)
+        case .info:  AppLog.info(message, category)
+        case .warn:  AppLog.warn(message, category)
+        case .error: AppLog.error(message, category)
         }
+        statusLabel.text = message
     }
 }

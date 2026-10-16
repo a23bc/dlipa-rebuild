@@ -45,7 +45,21 @@ final class AppStoreClient {
 
         let (data, response) = try await session.data(for: request)
         try validate(response, data: data)
-        return try StoreBag.parse(xml: data)
+        let bag = try StoreBag.parse(xml: data)
+
+        // The bag is the only place the SAP endpoints come from. If it came back
+        // without them, every later step fails with a message that will not say
+        // why, so record it here.
+        AppLog.info("bag received, " + String(data.count) + " bytes", .network)
+        if bag.hasSAPConfiguration {
+            AppLog.info("bag has SAP configuration, version " + String(bag.signSapVersion), .sap)
+        } else {
+            AppLog.warn("bag has no SAP configuration; signing will be unavailable", .sap)
+        }
+        if bag.volumeStoreDownloadProduct == nil {
+            AppLog.warn("bag has no download endpoint", .network)
+        }
+        return bag
     }
 
     // MARK: - Authenticate
@@ -70,6 +84,7 @@ final class AppStoreClient {
                       signer: SAPSigner) async throws -> Account {
         // A missing trailing slash gets a 204 and nothing else happens.
         let url = endpoint.hasSuffix("/") ? endpoint : endpoint + "/"
+        AppLog.info("authenticating against " + url, .auth)
 
         var request = URLRequest(url: URL(string: url)!)
         request.httpMethod = "POST"
@@ -126,8 +141,10 @@ final class AppStoreClient {
                          bag: StoreBag,
                          signer: SAPSigner) async throws -> URL {
         guard let endpoint = bag.volumeStoreDownloadProduct else {
+            AppLog.error("no download endpoint in the bag", .download)
             throw StoreError.noBagEndpoint
         }
+        AppLog.info("requesting download for " + appId + " from " + endpoint, .download)
 
         var components = URLComponents(string: endpoint)!
         components.queryItems = [URLQueryItem(name: "guid", value: guid)]
@@ -207,7 +224,20 @@ final class AppStoreClient {
 
             let (data, response) = try await session.data(for: signed)
             guard let http = response as? HTTPURLResponse else {
+                AppLog.error("response was not HTTP", .network)
                 throw StoreError.httpError(-1, "not an HTTP response")
+            }
+
+            // The status code plus whether the signature was attached is the
+            // pair that explains most failures: 403 with a signature present
+            // means Apple rejected it, 403 with no signature means it was never
+            // sent.
+            AppLog.debug("signed request to " + (signed.url?.absoluteString ?? "?")
+                         + " returned " + String(http.statusCode), .network)
+            if http.statusCode == 403 {
+                let hadSignature = signed.value(forHTTPHeaderField: "X-Apple-ActionSignature") != nil
+                AppLog.error("403 from " + (signed.url?.host ?? "?")
+                             + ", signature attached: " + String(hadSignature), .network)
             }
 
             // A 3xx that should be replayed as-is carries a Location and keeps
@@ -224,6 +254,7 @@ final class AppStoreClient {
                 return (data, http)
             }
 
+            AppLog.debug("following redirect to " + next.absoluteString, .network)
             var redirected = URLRequest(url: next)
             redirected.httpMethod = signed.httpMethod
             redirected.httpBody = signed.httpBody

@@ -11,7 +11,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         // and signing is blocked until it finishes.
         AssetStaging.stageIfNeeded { error in
             if let error {
-                print("[assets] staging failed: " + String(describing: error))
+                AppLog.error("staging failed: " + String(describing: error), .assets)
             }
         }
         return true

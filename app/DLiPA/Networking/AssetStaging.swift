@@ -66,12 +66,13 @@ enum AssetStaging {
                     atPath: target.path),
                    (attributes[.size] as? Int) == expectedSize {
                     copied += expectedSize
+                    AppLog.info("staged " + name + ", " + String(expectedSize) + " bytes", .assets)
                     progress?(Double(copied) / Double(totalBytes))
                     continue
                 }
 
                 guard let source = Bundle.main.url(forResource: name, withExtension: nil) else {
-                    print("[assets] " + name + " is missing from the app bundle")
+                    AppLog.error(name + " is missing from the app bundle", .assets)
                     firstError = AssetError.missingFromBundle(name)
                     break
                 }
@@ -86,7 +87,7 @@ enum AssetStaging {
                     copied += expectedSize
                     progress?(Double(copied) / Double(totalBytes))
                 } catch {
-                    print("[assets] failed to stage " + name + ": " + String(describing: error))
+                    AppLog.error("failed to stage " + name + ": " + String(describing: error), .assets)
                     firstError = error
                     break
                 }
@@ -99,6 +100,7 @@ enum AssetStaging {
     private static func finish(_ error: Error?,
                                destination: URL,
                                completion: @escaping (Error?) -> Void) {
+        AppLog.info("all " + String(files.count) + " assets staged to " + destination.path, .assets)
         if error == nil {
             // Only tell the bridge about the directory once every file is
             // there, so a partial set cannot be mistaken for a valid one.

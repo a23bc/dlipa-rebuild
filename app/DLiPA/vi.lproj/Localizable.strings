@@ -120,3 +120,5 @@
 "Apple returned HTTP %d: %@" = "Apple trả về HTTP %d: %@";
 "ap_invalid_credentials" = "Email hoặc mật khẩu không đúng";
 "assets_ready" = "Tài nguyên ký đã sẵn sàng";
+"log_share" = "Chia sẻ nhật ký";
+"log_empty" = "Chưa có gì để chia sẻ";

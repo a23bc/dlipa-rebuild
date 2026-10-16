@@ -120,3 +120,5 @@
 "Apple returned HTTP %d: %@" = "Apple이 HTTP %d를 반환했습니다: %@";
 "ap_invalid_credentials" = "잘못된 이메일 또는 비밀번호";
 "assets_ready" = "서명 자산 준비 완료";
+"log_share" = "로그 공유";
+"log_empty" = "공유할 항목이 없습니다";
