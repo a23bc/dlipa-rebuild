@@ -188,22 +188,25 @@ jobs:
           # pbxproj to go stale.
           xcodegen generate
           ls -la DLiPA.xcodeproj
+
+          # No -sdk iphoneos: the macos-15 image ships the iOS 18 SDK without
+          # the installed platform, and naming the SDK makes the asset and
+          # storyboard steps probe for runtimes that are not present.
+          #
+          # No xcpretty either: it is not installed, and "|| true" would mask
+          # a real build failure as success.
           set -o pipefail
           xcodebuild \
             -project DLiPA.xcodeproj \
             -scheme DLiPA \
             -configuration ${{ github.event.inputs.configuration || 'Release' }} \
-            -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
-            # No xcpretty here: it is not installed, and "|| true" would mask a
-          # real build failure as success.
-          clean build
-
+            clean build
       - name: Locate the built app
         id: app
         run: |
