@@ -96,7 +96,7 @@ enum AppLog {
         switch level {
         case .debug: category.logger.debug("\(full)")
         case .info: category.logger.info("\(full)")
-        case .warn: category.logger.warn("\(full)")
+        case .warn: category.logger.warning("\(full)")
         case .error: category.logger.error("\(full)")
         }
     }
