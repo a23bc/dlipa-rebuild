@@ -1,4 +1,4 @@
-//go:build darwin || ios || linux
+//go:build ios
 
 package unicorn
 
@@ -8,6 +8,9 @@ package unicorn
 // them out of libunicorn.a. Relying on -force_load alone is fragile: if that
 // flag is dropped the archive is simply not linked, and purego.Dlsym then
 // fails at runtime with an error that only shows up on a device.
+//
+// Only built for ios. The macOS host test build has no libunicorn.a to resolve
+// these references against, so including darwin here would break go test.
 //
 // No #cgo LDFLAGS here on purpose. Go rejects -Wl,-export_dynamic inside the
 // directive with "invalid flag in #cgo LDFLAGS", so the export flag is passed
