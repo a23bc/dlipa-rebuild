@@ -26,13 +26,13 @@ targets:
       # and copied into the app bundle.
       - path: DLiPA/Resources
         type: folder
-    dependencies:
-      # No framework dependency. The gomobile archive is force-loaded into
-      # the app binary by OTHER_LDFLAGS below, so the symbols resolve at link
-      # time and the bundle stays a single executable. Embedding an
-      # xcframework gave MobileInstallation a nested bundle to validate, which
-      # is what made registration fail with TrollStore error 181.
-
+    # No dependencies. The gomobile archive is force-loaded into the app
+    # binary by OTHER_LDFLAGS below, so the symbols resolve at link time and
+    # the bundle stays a single executable. Embedding an xcframework gave
+    # MobileInstallation a nested bundle to validate, which is what made
+    # registration fail with TrollStore error 181.
+    #
+    # (XcodeGen rejects an empty dependencies list, so the key is omitted.)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.a23bc.dliparebuild
