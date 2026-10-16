@@ -16,7 +16,10 @@ targets:
     sources:
       - path: DLiPA
         excludes:
+          # ibtool on the macos-15 image demands an installed iOS platform,
+          # which is not present. The launch screen comes from Info.plist.
           - "**/*.md"
+          - "LaunchScreen.storyboard"
       # The four Apple binaries are staged here by scripts/stage-assets.sh
       # and copied into the app bundle.
       - path: DLiPA/Resources
