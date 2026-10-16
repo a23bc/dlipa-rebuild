@@ -68,7 +68,7 @@ Push to `main` or open a pull request. The workflow runs two jobs:
 1. **go-bridge** — unit tests, cross-compiles Unicorn for iOS arm64, binds the
    Go module into `SapBridge.framework` with gomobile.
 2. **app** — downloads the framework, stages and verifies the Apple assets,
-   builds an unsigned `.app`, packages it as `DLiPA-unsigned.ipa`, uploads it
+   builds an unsigned `.app`, packages it as `DLiPA-<digest>.ipa`, uploads it
    as an artifact. Tagged pushes also attach it to a release.
 
 Run it manually from the Actions tab with **Run workflow**.
@@ -102,7 +102,9 @@ Run it manually from the Actions tab with **Run workflow**.
 
 ## Installing
 
-Download `DLiPA-unsigned.ipa` from the workflow run (or a release), then:
+Download the `DLiPA-<digest>.ipa` artifact from the workflow run - the name
+carries a short digest of the binary, so a stale copy cannot be mistaken for the
+current build (or a release), then:
 
 - **AltStore** — My Apps tab, tap +, choose the IPA, sign in with your Apple ID
 - **Sideloadly** — drag the IPA in, sign in
@@ -119,6 +121,16 @@ implements sign-in, search, and the signed download path — the parts that
 needed fixing. The original app's 100 Objective-C classes, 12 localisations,
 CocoaHTTPServer install flow and SSZipArchive packaging are not reproduced;
 the source was never published, only the compiled IPA.
+
+## Licence
+
+This project's own code is [MIT](LICENSE).
+
+Components it depends on keep their own terms, and some of them matter:
+**Unicorn is GNU GPL v2 and is statically linked**, so its terms travel with
+the binary. The full breakdown - ipatool, Unicorn, the Go dependencies, the
+Apple binaries, and the resources taken from the original DLiPA 1.4 - is in
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
 ## Acknowledgements
 

@@ -22,30 +22,23 @@ SOFTWARE.
 
 ===============================================================================
 
-WHY MIT
-
-  The main dependency this project builds on is ipatool, which is MIT, and MIT
-  is what allows the vendored protocol code to stay MIT instead of being
-  relicensed. Matching it keeps one licence in effect across the codebase
-  rather than mixing terms over files that are hard to separate.
-
-  It is also permissive enough that nobody who picks this up is restricted in
-  what they can do with it, which suits a tool whose whole purpose is to
-  recover a capability the original lost.
-
-WHAT THIS LICENCE DOES AND DOES NOT COVER
+Scope
 
   Covers: the Go signing bridge in sapbridge/, the Swift app in app/, the build
   scripts, and the CI configuration.
 
-  Does not cover:
+  Does NOT cover:
 
-    - The third-party components in NOTICE, which keep their own licences. Most
-      importantly, Unicorn is GPL v2 with a linking exception and is statically
-      linked into the binary, so its terms travel with the result. MIT on this
-      file cannot and does not override that.
+    - Third-party components, which keep their own licences. See
+      THIRD_PARTY_LICENSES.md. Most importantly, Unicorn is GNU GPL v2 with a
+      linking exception and is statically linked into the binary, so its terms
+      travel with the result and this MIT licence cannot override them.
 
     - The Apple binaries in VendorAssets/, which are Apple copyright.
 
     - The Assets.car, icons and Localizable.strings carried over from the
-      original DLiPA 1.4, whose repository states no licence. See NOTICE.
+      original DLiPA 1.4, whose repository states no licence at all.
+
+Why MIT: the protocol code is a trimmed copy of ipatool, which is MIT. Keeping
+the same licence means those vendored files stay under the terms they were
+written under rather than being relicensed.
