@@ -3,13 +3,16 @@
 package unicorn
 
 /*
-#cgo ios LDFLAGS: "-Wl,-export_dynamic"
-#cgo darwin LDFLAGS: "-Wl,-export_dynamic"
 
 // Referencing Unicorn symbols from compiled code forces the linker to pull
 // them out of libunicorn.a. Relying on -force_load alone is fragile: if that
 // flag is dropped the archive is simply not linked, and purego.Dlsym then
 // fails at runtime with an error that only shows up on a device.
+//
+// No #cgo LDFLAGS here on purpose. Go rejects -Wl,-export_dynamic inside the
+// directive with "invalid flag in #cgo LDFLAGS", so the export flag is passed
+// through the CGO_LDFLAGS environment variable instead, which the workflow sets
+// for the gomobile bind step. This file only needs the undefined references.
 extern unsigned int uc_version(unsigned int *major, unsigned int *minor);
 extern int uc_open(int arch, int mode, void **uc);
 extern int uc_close(void *uc);
