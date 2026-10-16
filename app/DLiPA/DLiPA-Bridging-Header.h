@@ -19,12 +19,12 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)close:(NSError **)error;
 @end
 
-FOUNDATION_EXPORT NSString *SapbridgeBundleDirValue(void);
-FOUNDATION_EXPORT NSString *SapbridgeGuidFromHardware(NSData *hardwareID);
-FOUNDATION_EXPORT NSData *SapbridgeKBSync(NSData *hardwareID, NSString *dsid, NSError **error);
-FOUNDATION_EXPORT SapbridgeSigner *SapbridgeNew(NSString *setupURL, NSString *certURL, int32_t version, NSData *hardwareID, NSError **error);
-FOUNDATION_EXPORT BOOL SapbridgeParseDSID(NSString *value, int64_t *ret0_, NSError **error);
-FOUNDATION_EXPORT NSString *SapbridgeSerialNumber(NSData *hardwareID, NSError **error);
-FOUNDATION_EXPORT void SapbridgeSetBundleDir(NSString *path);
+FOUNDATION_EXPORT NSString * _Nonnull SapbridgeBundleDirValue(void);
+FOUNDATION_EXPORT NSString * _Nonnull SapbridgeGuidFromHardware(NSData * _Nullable hardwareID);
+FOUNDATION_EXPORT NSData * _Nullable SapbridgeKBSync(NSData * _Nullable hardwareID, NSString * _Nullable dsid, NSError * _Nullable * _Nullable error);
+FOUNDATION_EXPORT SapbridgeSigner * _Nullable SapbridgeNew(NSString * _Nullable setupURL, NSString * _Nullable certURL, int32_t version, NSData * _Nullable hardwareID, NSError * _Nullable * _Nullable error);
+FOUNDATION_EXPORT BOOL SapbridgeParseDSID(NSString * _Nullable value, int64_t * _Nullable ret0_, NSError * _Nullable * _Nullable error);
+FOUNDATION_EXPORT NSString * _Nonnull SapbridgeSerialNumber(NSData * _Nullable hardwareID, NSError * _Nullable * _Nullable error);
+FOUNDATION_EXPORT void SapbridgeSetBundleDir(NSString * _Nullable path);
 
 NS_ASSUME_NONNULL_END
