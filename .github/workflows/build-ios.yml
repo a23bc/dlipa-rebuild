@@ -221,11 +221,27 @@ jobs:
             -configuration ${{ github.event.inputs.configuration || 'Release' }} \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
-            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=YES \
             DEVELOPMENT_TEAM="" \
             clean build
+      - name: Adhoc-sign the app
+        run: |
+          # Xcode 16 refuses adhoc signing against the iOS 18 SDK, so the build
+          # runs unsigned and the signature is attached here instead.
+          #
+          # The signature is not cosmetic: it is what puts the
+          # LC_CODE_SIGNATURE load command into the binary. Without it
+          # MobileInstallation types the bundle as System and TrollStore fails
+          # registration with error 181. An adhoc signature needs no developer
+          # account, and AltStore, Sideloadly and TrollStore all re-sign over
+          # it on install.
+          APP=$(find app/build -name "DLiPA.app" -maxdepth 4 -type d | head -n 1)
+          codesign --force --sign - --timestamp=none --generate-entitlement-der "$APP"
+          echo "==> signature attached"
+          codesign -dvvv "$APP" 2>&1 | head -n 8
+          ls -la "$APP/_CodeSignature"
+
       - name: Locate the built app
         id: app
         run: |
