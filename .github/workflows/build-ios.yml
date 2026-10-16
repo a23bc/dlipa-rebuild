@@ -182,12 +182,14 @@ jobs:
           ls -la VendorAssets
           ./scripts/stage-assets.sh "$GITHUB_WORKSPACE/VendorAssets" "$GITHUB_WORKSPACE/app/DLiPA/Resources/SapAssets"
 
-      - name: Install xcodegen
+      - name: Install build tools
         run: |
-          # project.yml is the source of truth; xcodegen turns it into a real
-          # .xcodeproj so there is no fragile hand-edited pbxproj.
-          brew install xcodegen
+          # xcodegen turns project.yml into a real .xcodeproj, so there is no
+          # fragile hand-edited pbxproj. ldid attaches the adhoc signature
+          # Xcode refuses to produce.
+          brew install xcodegen ldid
           xcodegen --version
+          ldid --help 2>&1 | head -n 3
 
       - name: Show build environment
         run: |
@@ -230,18 +232,21 @@ jobs:
           # Xcode 16 refuses adhoc signing against the iOS 18 SDK, so the build
           # runs unsigned and the signature is attached here instead.
           #
-          # The signature is not cosmetic: it is what puts the
-          # LC_CODE_SIGNATURE load command into the binary. Without it
+          # ldid rather than codesign: codesign rejects the .lproj directories as
+          # "bundle format unrecognized", while ldid seals the executable and
+          # derives the bundle signature. ldid is also what TrollStore runs.
+          #
+          # The signature is not cosmetic: it is what writes the
+          # LC_CODE_SIGNATURE load command, and without that command
           # MobileInstallation types the bundle as System and TrollStore fails
-          # registration with error 181. An adhoc signature needs no developer
-          # account, and AltStore, Sideloadly and TrollStore all re-sign over
-          # it on install.
+          # registration with error 181.
           APP=$(find app/build -name "DLiPA.app" -maxdepth 4 -type d | head -n 1)
-          codesign --force --sign - --timestamp=none --generate-entitlement-der "$APP"
-          echo "==> signature attached"
-          codesign -dvvv "$APP" 2>&1 | head -n 8
-          ls -la "$APP/_CodeSignature"
-
+          if [ -z "$APP" ]; then echo "::error::DLiPA.app not found"; exit 1; fi
+          : > empty.plist
+          ldid -Sempty.plist "$APP"
+          rm -f empty.plist
+          echo "==> ldid signed the app"
+          du -sh "$APP"
       - name: Locate the built app
         id: app
         run: |
