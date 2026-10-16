@@ -66,8 +66,9 @@ final class SAPSigner {
             return cached as Data
         }
         var error: NSError?
-        let fresh = SapbridgeKBSync(hardware.bytes, dsid, &error)
-        if let error { throw error }
+        guard let fresh = SapbridgeKBSync(hardware.bytes, dsid, &error) else {
+            throw error ?? NSError(domain: "SAPSigner", code: 3, userInfo: nil)
+        }
         Self.kbsyncCache.setObject(fresh as NSData, forKey: key)
         return fresh
     }
@@ -87,7 +88,7 @@ final class SAPSigner {
 
     func close() {
         var error: NSError?
-        signer.perform(Selector(("close:")), with: &error)
+        _ = signer.perform(Selector(("close:")), with: error)
         if let error {
             print("[sap] close failed: " + error.localizedDescription)
         }
