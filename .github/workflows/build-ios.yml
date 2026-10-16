@@ -153,8 +153,13 @@ jobs:
 
       - name: Unpack the framework
         run: |
-          tar -xzf app/DLiPA/Frameworks/sapbridge-ios.tar.gz -C app/DLiPA/Frameworks
-          ls -la app/DLiPA/Frameworks
+          # project.yml refers to Frameworks/SapBridge.xcframework, and
+          # XcodeGen resolves that against the sources root, which is app/.
+          # Unpack there, not into app/DLiPA.
+          mkdir -p app/Frameworks
+          tar -xzf app/DLiPA/Frameworks/sapbridge-ios.tar.gz -C app/Frameworks
+          ls -laR app/Frameworks | head -20
+
 
       - name: Bundle the Apple SAP assets
         run: |
