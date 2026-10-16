@@ -227,7 +227,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             DEVELOPMENT_TEAM="" \
             clean build
-            - name: Locate the built app
+      - name: Locate the built app
         id: app
         run: |
           APP=$(find app/build -name "DLiPA.app" -maxdepth 4 -type d | head -n 1)
