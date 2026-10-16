@@ -54,6 +54,12 @@ targets:
         CODE_SIGN_IDENTITY: ""
         DEVELOPMENT_TEAM: ""
         PROVISIONING_PROFILE_SPECIFIER: ""
+        # Unicorn is force-loaded into SapBridge at build time, but the app
+        # link re-links the framework objects, so it needs the archive too.
+        # scripts/build-unicorn-ios.sh leaves it at $(SRCROOT)/build/ios/.
+        OTHER_LDFLAGS:
+          - "-Wl,-force_load,$(SRCROOT)/build/ios/libunicorn.a"
+          - "-Wl,-export_dynamic"
         # Local networking + arbitrary loads for the embedded HTTP server
         # that serves the itms-services install manifest.
         NSAppTransportSecurity: ""
