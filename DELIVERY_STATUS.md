@@ -1,58 +1,69 @@
-# Install error 181: the embedded framework was malformed
+# Error 181: the embedded framework was the cause
 
-    DLiPA-fe69facd.ipa    91.54 MB
-    sha256  138e325537a04ef923cc6410b1ccdfc93a837bad09ec8da80464a8b61e366d63
-    run     https://github.com/a23bc/dlipa-rebuild/actions/runs/38886847819
+    DLiPA-7ada1800.ipa    91.53 MB
+    sha256  3e914da1aa0e93e82acc60f3258fd7a526c08efe07316c86745cb9a4cb44a033
+    run     https://github.com/a23bc/dlipa-rebuild/actions/runs/38891702142
 
-## Ruling out the stale copy
+## Five attempts, same failure
 
-This attempt installed `DLiPA-8e892eac.ipa`, the digest-named file from the
-previous run, and the log is identical apart from timestamps. So the build
-itself is the cause, and the cause is in the registration dictionary:
+Every attempt failed with error 181 and `ApplicationType = System`, while
+ldid and the CoreTrust bypass both succeeded each time. The app Info.plist was
+matched to the original key by key, and the framework plist was fixed, and
+neither changed anything. So the remaining difference had to be structural.
 
-    ApplicationType = System
+## What it was
 
-`System` is what MobileInstallation assigns when a bundle contains something
-it considers malformed. Signing was fine throughout - ldid returned 0 twice
-and the CoreTrust bypass applied to both binaries.
+We embedded `SapBridge.framework`. The original DLiPA embeds nothing - it is a
+single executable. MobileInstallation has to validate every nested bundle
+during registration, and that is what it was rejecting.
 
-## The cause
+The framework turned out not to be needed at all. Checking the app binary:
 
-The app embeds `SapBridge.framework`, and gomobile writes its Info.plist as:
+    SapbridgeSerialNumber     present
+    SapbridgeKBSync           present
+    SapbridgeNew              present
+    SapbridgeSetBundleDir     present
+    SapbridgeGuidFromHardware present
+    uc_open                   present
+    uc_emu_start              present
 
-    CFBundleIdentifier  SapBridge        <- not reverse-DNS
-    MinimumOSVersion   100.0            <- not a real version
+Everything is already in the app binary, because the link force-loads the
+archives. The framework was a 32 KB shim carrying no code of its own.
 
-A bundle identifier has to be reverse-DNS. `SapBridge` is not, and 100.0 is
-not a version iOS recognises. The original DLiPA bundles no frameworks at all,
-which is why it never hit this; every prior fix was aimed at the app's own
-Info.plist and left the nested one untouched.
+## What changed
 
-## The fix, verified in the shipped artifact
+- Removed the framework dependency from project.yml
+- The bridge job now ships the gomobile archive itself instead of unpacking a
+  framework, and `OTHER_LDFLAGS` force-loads both it and libunicorn.a
+- The C declarations moved into the bridging header, with the nullability taken
+  from the generated header rather than written from memory
 
-Rewritten before packaging, then read back out of the IPA:
+## Verified in the shipped artifact
 
-    CFBundleIdentifier   com.a23bc.dliparebuild.SapBridge
-    MinimumOSVersion    15.0
-    CFBundlePackageType FMWK
-    reverse-DNS form    YES
+    Frameworks/ entries              none
+    install-critical keys             9/9 identical to the original
+    Assets.car                        IDENTICAL
+    AppIcon60x60@2x.png               IDENTICAL
+    AppIcon76x76@2x~ipad.png          IDENTICAL
+    PkgInfo                           IDENTICAL
+    bundle id                         com.a23bc.dliparebuild
+    minimum iOS                       15.0
 
-The step fails loudly if the framework is not where the build puts it, rather
-than skipping silently - which is how this stayed hidden for four attempts.
+The bundle is now the same shape as the original: one executable, no nested
+bundles.
 
-## Everything else still holds
+## Two self-inflicted bugs on the way
 
-    Assets.car, both icons, PkgInfo   byte-identical to the original
-    app Info.plist install-critical keys   9/9 identical
-    executable permissions           755
-    bundle id                        com.a23bc.dliparebuild
-    minimum iOS                      15.0
+Both caught by the CI build, both worth recording:
 
-## If it still fails
+1. Removing the dependency left `dependencies:` empty, and XcodeGen rejects
+   that: "Decoding failed at dependencies: Incorrect type". The key has to be
+   omitted, not emptied.
 
-This is the last malformed thing in the bundle that I can find. If error 181
-persists with this file, the remaining suspect is the framework being
-embedded at all: the original is a single binary, and the fallback would be
-to link the bridge statically into the app instead of embedding it. That is a
-real change rather than a metadata fix, so I would rather know the result of
-this build first.
+2. The C declarations I wrote for the bridging header had the wrong
+   nullability on `SapbridgeNew` and `SapbridgeKBSync` - both return optional,
+   and the guard-let call sites then failed to compile. I had written them
+   from memory instead of from the generated header that was already on disk.
+
+That second one is the same mistake as an earlier round: guessing an API
+shape when the real one is available to read. It cost a build cycle.
