@@ -1,69 +1,61 @@
-# Error 181: the embedded framework was the cause
+# Install error 181: found by comparing against the apps that work
 
-    DLiPA-7ada1800.ipa    91.53 MB
-    sha256  3e914da1aa0e93e82acc60f3258fd7a526c08efe07316c86745cb9a4cb44a033
-    run     https://github.com/a23bc/dlipa-rebuild/actions/runs/38891702142
+    DLiPA-7a59af5a.ipa    85.32 MB   (was 91.53)
+    sha256  f3685096ee8286ddd5973e6e2c92028a303b1104543b9d243ae565abd3a6f9ca
+    run     https://github.com/a23bc/dlipa-rebuild/actions/runs/38899947723
 
-## Five attempts, same failure
+## The comparison that cracked it
 
-Every attempt failed with error 181 and `ApplicationType = System`, while
-ldid and the CoreTrust bypass both succeeded each time. The app Info.plist was
-matched to the original key by key, and the framework plist was fixed, and
-neither changed anything. So the remaining difference had to be structural.
+Three apps of yours that install, and what each one does:
 
-## What it was
+| App | Build action | Signing |
+|---|---|---|
+| ipa-downloader | `build` | none, `CODE_SIGNING_ALLOWED=NO` |
+| PNG2HEIF | `archive` | none, `CODE_SIGNING_ALLOWED=NO` |
+| dlipa-next | tests only | n/a |
 
-We embedded `SapBridge.framework`. The original DLiPA embeds nothing - it is a
-single executable. MobileInstallation has to validate every nested bundle
-during registration, and that is what it was rejecting.
+**ipa-downloader uses the same flags we do and installs with no signature at
+all.** That ruled out the LC_CODE_SIGNATURE theory I had been chasing for three
+attempts. The `codesign` and `ldid` steps are gone.
 
-The framework turned out not to be needed at all. Checking the app binary:
+## What was actually wrong
 
-    SapbridgeSerialNumber     present
-    SapbridgeKBSync           present
-    SapbridgeNew              present
-    SapbridgeSetBundleDir     present
-    SapbridgeGuidFromHardware present
-    uc_open                   present
-    uc_emu_start              present
+The bundle root contained `CoreFP.icxs`, 7 MB, in addition to the correct copy
+in `Resources/SapAssets/`. The new step prints the bundle root before and after,
+and named it directly:
 
-Everything is already in the app binary, because the link force-loads the
-archives. The framework was a 32 KB shim carrying no code of its own.
+    ==> bundle root before cleanup
+    app/build/.../DLiPA.app/CoreFP.icxs
 
-## What changed
+It came from an early attempt to satisfy the `./../CoreFP.icxs` path in
+`shim_platform.go`. That path is internal to the emulated guest - it is the path
+the CoreFP process opens inside the virtual machine, never a path on the iOS
+filesystem. The Go loader reads all four binaries from the directory
+`BundleDir` names, which the app sets to `Resources/SapAssets`, and feeds them
+to the guest from memory. The root copy was dead weight that MobileInstallation
+validated and rejected.
 
-- Removed the framework dependency from project.yml
-- The bridge job now ships the gomobile archive itself instead of unpacking a
-  framework, and `OTHER_LDFLAGS` force-loads both it and libunicorn.a
-- The C declarations moved into the bridging header, with the nullability taken
-  from the generated header rather than written from memory
+## Bundle root now
 
-## Verified in the shipped artifact
+    AppIcon60x60@2x.png
+    AppIcon76x76@2x~ipad.png
+    Assets.car
+    DLiPA
+    Info.plist
+    PkgInfo
 
-    Frameworks/ entries              none
-    install-critical keys             9/9 identical to the original
-    Assets.car                        IDENTICAL
-    AppIcon60x60@2x.png               IDENTICAL
-    AppIcon76x76@2x~ipad.png          IDENTICAL
-    PkgInfo                           IDENTICAL
-    bundle id                         com.a23bc.dliparebuild
-    minimum iOS                       15.0
+The same file list as the original, and the same shape as ipa-downloader. The
+IPA dropped from 91.53 to 85.32 MB, which is the duplicate going away.
 
-The bundle is now the same shape as the original: one executable, no nested
-bundles.
+The four assets are intact in `Resources/SapAssets/`: CoreFP 90.45 MB,
+AppleMediaServices 14.13 MB, CoreFP.icxs 7.02 MB, commerce 7.72 MB.
 
-## Two self-inflicted bugs on the way
+## Also fixed
 
-Both caught by the CI build, both worth recording:
+`package-ipa.sh` was failing the build on a `_CodeSignature` check I had added for
+the signing theory. Removed, along with the signing references in the README.
 
-1. Removing the dependency left `dependencies:` empty, and XcodeGen rejects
-   that: "Decoding failed at dependencies: Incorrect type". The key has to be
-   omitted, not emptied.
-
-2. The C declarations I wrote for the bridging header had the wrong
-   nullability on `SapbridgeNew` and `SapbridgeKBSync` - both return optional,
-   and the guard-let call sites then failed to compile. I had written them
-   from memory instead of from the generated header that was already on disk.
-
-That second one is the same mistake as an earlier round: guessing an API
-shape when the real one is available to read. It cost a build cycle.
+One workflow breakage of my own along the way: removing a step left the next
+one indented 12 spaces instead of 6, which GitHub rejected before starting any
+job. Worth noting because the symptom, a run failing in 0 seconds, looks
+nothing like a real failure.
