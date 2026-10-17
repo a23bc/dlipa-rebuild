@@ -261,9 +261,19 @@ jobs:
           git clone --depth 1 --branch v2.1.5-procursus5 \
             https://github.com/opa334/ldid.git /tmp/ldid-src
           make -C /tmp/ldid-src -j"$(sysctl -n hw.ncpu)"
+          # The entitlements must name the application. Signing with only
+          # get-task-allow leaves the signature without an
+          # application-identifier, so TrollStore reads a single entitlement
+          # and cannot type the bundle as an application. It stays System and
+          # registration fails with 181.
+          #
+          # No certificate is required for this: the identifier is just the
+          # team prefix the app is signed under, and for a locally signed binary
+          # any stable value works. TrollStore replaces it on install.
           plutil -create xml1 ent.plist
-          plutil -insert get-task-allow -bool true ent.plist
-          # -I sets the CodeDirectory identifier. Without it ldid uses the
+          plutil -insert application-identifier -string "DLREBUILD.com.a23bc.dliparebuild" ent.plist
+          plutil -insert "com.apple.developer.team-identifier" -string "DLREBUILD" ent.plist
+          plutil -insert get-task-allow -bool true ent.plist          # -I sets the CodeDirectory identifier. Without it ldid uses the
           # executable basename, which leaves the binary identified as "DLiPA"
           # instead of the bundle id, and MobileInstallation then types the
           # bundle as System. The original DLiPA carries the full bundle id here.
