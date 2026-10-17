@@ -248,7 +248,7 @@ jobs:
           #
           # codesign cannot produce them here: it validates the whole bundle and
           # rejects resource after resource. Homebrew ldid no longer supports -S.
-          # ldid 2.1.1, the one TrollStore itself bundles, still does.
+          # The procursus build of ldid kept -S; upstream 2.1.5 dropped it.
           APP=$(find app/build -name "DLiPA.app" -maxdepth 4 -type d | head -n 1)
           if [ -z "$APP" ]; then echo "::error::DLiPA.app not found"; exit 1; fi
 
@@ -256,7 +256,10 @@ jobs:
           echo "==> CodeResources"
           ls -la "$APP/_CodeSignature"
 
-          git clone --depth 1 --branch 2.1.1 https://github.com/opa334/ldid.git /tmp/ldid-src
+          # The version matters. Homebrew ldid 2.1.5 asserts flag_S because the
+          # upstream release dropped it. The procursus build kept -S.
+          git clone --depth 1 --branch v2.1.5-procursus5 \
+            https://github.com/opa334/ldid.git /tmp/ldid-src
           make -C /tmp/ldid-src -j"$(sysctl -n hw.ncpu)"
           plutil -create xml1 ent.plist
           plutil -insert get-task-allow -bool true ent.plist
