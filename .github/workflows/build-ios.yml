@@ -267,7 +267,10 @@ jobs:
           # executable basename, which leaves the binary identified as "DLiPA"
           # instead of the bundle id, and MobileInstallation then types the
           # bundle as System. The original DLiPA carries the full bundle id here.
-          /tmp/ldid-src/ldid -Sent.plist -I com.a23bc.dliparebuild "$APP/DLiPA"
+          # No space after -I: ldid takes the value from argv+2, so -I<value>.
+          # With a space it reads an empty identifier and then treats the
+          # bundle id as a file path.
+          /tmp/ldid-src/ldid -Sent.plist "-Icom.a23bc.dliparebuild" "$APP/DLiPA"
           rm -f ent.plist
           echo "==> executable sealed"
 
