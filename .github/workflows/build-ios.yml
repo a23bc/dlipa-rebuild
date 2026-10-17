@@ -255,11 +255,15 @@ jobs:
           ls -la "$APP/_CodeSignature"
           # The load command is what iOS reads to decide ApplicationType.
           # codesign adds it to the executable without the bundle walk.
-          codesign --force --sign - --timestamp=none --entitlements /dev/null "$APP/DLiPA" 2>&1 || \
-          codesign --force --sign - --timestamp=none "$APP/DLiPA"
+          # Sign the Mach-O only. Passing the .app makes codesign walk the
+          # .lproj directories and fail, so the executable is named directly.
+          # A real plist is required: /dev/null is not one.
+          plutil -create xml1 ent.plist
+          plutil -insert get-task-allow -bool true ent.plist
+          codesign --force --sign - --timestamp=none --entitlements ent.plist "$APP/DLiPA"
+          rm -f ent.plist
           echo "==> executable signed"
           codesign -dvv "$APP/DLiPA" 2>&1 | head -n 6
-
       - name: Check the bundle for stray files
         run: |
           # CoreFP.icxs was ending up at the bundle root as well as inside
