@@ -271,8 +271,11 @@ jobs:
           # team prefix the app is signed under, and for a locally signed binary
           # any stable value works. TrollStore replaces it on install.
           plutil -create xml1 ent.plist
-          plutil -insert application-identifier -string "DLREBUILD.com.a23bc.dliparebuild" ent.plist
-          plutil -insert "com.apple.developer.team-identifier" -string "DLREBUILD" ent.plist
+          plutil -insert application-identifier -string "A23BC00001.com.a23bc.dliparebuild" ent.plist
+          # A team identifier must be ten alphanumerics; anything shorter is
+          # rejected by plutil. The value is arbitrary - TrollStore rewrites it on
+          # install - but it has to be well formed.
+          plutil -insert "com.apple.developer.team-identifier" -string "A23BC00001" ent.plist
           plutil -insert get-task-allow -bool true ent.plist
           # -I sets the CodeDirectory identifier. Without it ldid uses the
           # executable basename, which leaves the binary identified as "DLiPA"
