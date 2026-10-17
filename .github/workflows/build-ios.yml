@@ -239,35 +239,30 @@ jobs:
         run: |
           # TrollStore error 181 with ApplicationType = System means
           # MobileInstallation found the bundle unsealed. The original DLiPA 1.4,
-          # which installs, carries two things an unsigned Xcode build does not:
+          # which installs on this device, carries two things an unsigned Xcode
+          # build does not:
           #
-          #   1. _CodeSignature/CodeResources, a plist listing every resource and
-          #      its SHA-256
+          #   1. _CodeSignature/CodeResources, a plist listing every resource
+          #      with its SHA-1 and SHA-256
           #   2. an LC_CODE_SIGNATURE load command in the Mach-O executable
           #
-          # codesign would emit both but refuses to walk .lproj directories, and
-          # Homebrew ldid no longer supports -S. So CodeResources is generated
-          # directly and the load command is patched in.
+          # codesign cannot produce them here: it validates the whole bundle and
+          # rejects resource after resource. Homebrew ldid no longer supports -S.
+          # ldid 2.1.1, the one TrollStore itself bundles, still does.
           APP=$(find app/build -name "DLiPA.app" -maxdepth 4 -type d | head -n 1)
           if [ -z "$APP" ]; then echo "::error::DLiPA.app not found"; exit 1; fi
+
           python3 scripts/make-coderesources.py "$APP"
           echo "==> CodeResources"
           ls -la "$APP/_CodeSignature"
-          # codesign validates the whole parent bundle even when given the
-          # executable, and rejects the .lproj directories. Moving them aside
-          # for the duration of the call is the only way to get the
-          # LC_CODE_SIGNATURE load command written.
+
+          git clone --depth 1 --branch 2.1.1 https://github.com/opa334/ldid.git /tmp/ldid-src
+          make -C /tmp/ldid-src -j"$(sysctl -n hw.ncpu)"
           plutil -create xml1 ent.plist
           plutil -insert get-task-allow -bool true ent.plist
-          mkdir -p ../lproj-stash
-          mv "$APP"/*.lproj ../lproj-stash/
-          codesign --force --sign - --timestamp=none --entitlements ent.plist "$APP/DLiPA"
-          mv ../lproj-stash/*.lproj "$APP/"
-          rm -rf ../lproj-stash ent.plist
-          echo "==> executable signed"
-          codesign -dvv "$APP/DLiPA" 2>&1 | head -n 6
-
-      - name: Check the bundle for stray files
+          /tmp/ldid-src/ldid -Sent.plist "$APP/DLiPA"
+          rm -f ent.plist
+          echo "==> executable sealed"      - name: Check the bundle for stray files
         run: |
           # CoreFP.icxs was ending up at the bundle root as well as inside
           # Resources/SapAssets. The root copy is a leftover from an early
@@ -282,6 +277,15 @@ jobs:
           find "$APP" -maxdepth 1 -type f ! -name "Info.plist" ! -name "PkgInfo" ! -name "DLiPA" ! -name "Assets.car" ! -name "*.png" -print -delete
           echo "==> bundle root after cleanup"
           ls -la "$APP"
+
+      - name: Check the bundle for stray files
+        run: |
+          # CoreFP.icxs was ending up at the bundle root as well as inside
+          # Resources/SapAssets. The root copy was a leftover and is unnecessary:
+          # the Go loader reads the assets from the directory BundleDir names.
+          APP=$(find app/build -name "DLiPA.app" -maxdepth 4 -type d | head -n 1)
+          ls -la "$APP"
+          find "$APP" -maxdepth 1 -type f ! -name "Info.plist" ! -name "PkgInfo" ! -name "DLiPA" ! -name "Assets.car" ! -name "*.png" -print -delete
 
       - name: Package as IPA
         id: ipa
