@@ -253,17 +253,20 @@ jobs:
           python3 scripts/make-coderesources.py "$APP"
           echo "==> CodeResources"
           ls -la "$APP/_CodeSignature"
-          # The load command is what iOS reads to decide ApplicationType.
-          # codesign adds it to the executable without the bundle walk.
-          # Sign the Mach-O only. Passing the .app makes codesign walk the
-          # .lproj directories and fail, so the executable is named directly.
-          # A real plist is required: /dev/null is not one.
+          # codesign validates the whole parent bundle even when given the
+          # executable, and rejects the .lproj directories. Moving them aside
+          # for the duration of the call is the only way to get the
+          # LC_CODE_SIGNATURE load command written.
           plutil -create xml1 ent.plist
           plutil -insert get-task-allow -bool true ent.plist
+          mkdir -p ../lproj-stash
+          mv "$APP"/*.lproj ../lproj-stash/
           codesign --force --sign - --timestamp=none --entitlements ent.plist "$APP/DLiPA"
-          rm -f ent.plist
+          mv ../lproj-stash/*.lproj "$APP/"
+          rm -rf ../lproj-stash ent.plist
           echo "==> executable signed"
           codesign -dvv "$APP/DLiPA" 2>&1 | head -n 6
+
       - name: Check the bundle for stray files
         run: |
           # CoreFP.icxs was ending up at the bundle root as well as inside
