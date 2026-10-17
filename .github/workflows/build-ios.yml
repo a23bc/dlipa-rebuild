@@ -273,7 +273,8 @@ jobs:
           plutil -create xml1 ent.plist
           plutil -insert application-identifier -string "DLREBUILD.com.a23bc.dliparebuild" ent.plist
           plutil -insert "com.apple.developer.team-identifier" -string "DLREBUILD" ent.plist
-          plutil -insert get-task-allow -bool true ent.plist          # -I sets the CodeDirectory identifier. Without it ldid uses the
+          plutil -insert get-task-allow -bool true ent.plist
+          # -I sets the CodeDirectory identifier. Without it ldid uses the
           # executable basename, which leaves the binary identified as "DLiPA"
           # instead of the bundle id, and MobileInstallation then types the
           # bundle as System. The original DLiPA carries the full bundle id here.
