@@ -263,7 +263,11 @@ jobs:
           make -C /tmp/ldid-src -j"$(sysctl -n hw.ncpu)"
           plutil -create xml1 ent.plist
           plutil -insert get-task-allow -bool true ent.plist
-          /tmp/ldid-src/ldid -Sent.plist "$APP/DLiPA"
+          # -I sets the CodeDirectory identifier. Without it ldid uses the
+          # executable basename, which leaves the binary identified as "DLiPA"
+          # instead of the bundle id, and MobileInstallation then types the
+          # bundle as System. The original DLiPA carries the full bundle id here.
+          /tmp/ldid-src/ldid -Sent.plist -I com.a23bc.dliparebuild "$APP/DLiPA"
           rm -f ent.plist
           echo "==> executable sealed"
 
