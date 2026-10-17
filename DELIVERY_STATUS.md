@@ -1,52 +1,49 @@
-# Sealed: the bundle now matches the one that installs
+# Sealed and identified: the last identity mismatch
 
-    DLiPA-e21fe5a7.ipa    85.45 MB
-    sha256  034940478a5ef78d0599a6e00a0b8c6cb935daa98f8fcac0a126d1a7b97dfb69
-    run     https://github.com/a23bc/dlipa-rebuild/actions/runs/39018770540
+    DLiPA-c51cf9d3.ipa    85.45 MB
+    sha256  94c7cc48f8393c923c79dbd0f61b538d03022d36aac937f19a467024124ccb2d
+    run     https://github.com/a23bc/dlipa-rebuild/actions/runs/39020289028
 
-## What was missing
+## What the install log revealed
 
-The confirmation that the original DLiPA 1.4 installs on this device made it
-the reference. Comparing the two bundles field by field found two things it
-has and every build of ours lacked:
+TrollStore extracted a different set of entitlements from our binary than
+from the original: only `get-task-allow`, where the original also yielded
+`application-identifier`, `team-identifier` and `keychain-access-groups`.
 
-    _CodeSignature/CodeResources    present -> absent
-    LC_CODE_SIGNATURE in the Mach-O present -> absent
+## The cause
+Parsing the CodeDirectory of both binaries:
 
-CodeResources is the sealing manifest - a plist listing every resource with its
-SHA-1 and SHA-256, plus the omission rules. Without it MobileInstallation
-treats the bundle as unsealed, types it System, and fails registration with
-error 181. That also explains the `MissingSINF = 0` that had been nagging: iOS
-reports no missing signature container because it is looking for the sealing
-artefacts it never found.
+    original identifier   com.ahmedbafkir.dlipa
+    ours identifier       DLiPA
 
-This is why comparing against `ipa-downloader` sent me down the wrong path.
-It has neither and still installs, so I concluded signing was irrelevant. It
-was the wrong reference - the original DLiPA was the right one.
+ldid defaults the CodeDirectory identifier to the executable basename. Ours
+said `DLiPA`; the original carries the full bundle id. MobileInstallation
+reads that field to type the bundle, and a bare filename is not a valid
+identity - hence `ApplicationType = System`.
 
-## How it is produced
+`-I` overrides it. Two details worth recording because both cost a build:
 
-`codesign` cannot do it here: it validates the whole bundle and rejects one
-resource after another, first `.lproj`, then the icons, and there is no
-certificate to satisfy it with. Homebrew `ldid` 2.1.5 dropped the `-S` flag it
-would need. So both artefacts are produced directly:
-
-- `scripts/make-coderesources.py` writes `_CodeSignature/CodeResources`
-- `ldid` from opa334 at tag `v2.1.5-procursus5`, the build that kept `-S`,
-  writes `LC_CODE_SIGNATURE` into the executable
+- ldid takes the value from `argv + 2`, so it must be attached: `-I<id>`.
+  `-I com.a23bc.dliparebuild` left the identifier empty and then treated the
+  bundle id as a file path.
+- Only the procursus build of ldid still has `-S`, and only it documents
+  `-I` alongside it.
 
 ## Verified in the shipped IPA
 
-    _CodeSignature/CodeResources   10234 bytes
-    LC_CODE_SIGNATURE             present, same as the original
-    bundle root                   AppIcon x2, Assets.car, DLiPA, Info.plist, PkgInfo
+    CodeDirectory identifier   com.a23bc.dliparebuild   (was: DLiPA)
+    _CodeSignature/CodeResources 10234 bytes
+    LC_CODE_SIGNATURE            present
+    bundle root                  unchanged and matching the original
 
-And the sealing manifest itself, compared against the original:
+## What still differs, and cannot be fixed here
 
-    keys, rules, rules2          identical
-    files 27 vs 26               ours add the 4 SAP assets and CoreFP.icxs
-                                  under Resources/, the original has
-                                  embedded.mobileprovision and the files we
-                                  correctly do not carry
+The original carries a CMS signature in slot `0x10000` - a real signature
+from an Apple Development certificate. Ours has an alternate CodeDirectory
+in that slot instead, because producing a CMS signature needs a certificate
+chain and there is no developer account here.
 
-The SHA-256 values were checked against the files when generated: 0 mismatches.
+TrollStore exists precisely to install Apple-signed apps by bypassing that,
+and it re-signs on install regardless, so this is expected rather than
+blocking. Worth knowing in case the CoreTrust bypass behaves differently
+for a binary that never had one.
