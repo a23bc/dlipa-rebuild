@@ -1,49 +1,49 @@
-# Sealed and identified: the last identity mismatch
+# The signature now names the application
 
-    DLiPA-c51cf9d3.ipa    85.45 MB
-    sha256  94c7cc48f8393c923c79dbd0f61b538d03022d36aac937f19a467024124ccb2d
-    run     https://github.com/a23bc/dlipa-rebuild/actions/runs/39020289028
+    DLiPA-80cfc099.ipa    85.45 MB
+    sha256  c15267fbdfc5b3c50788cca51f6f63859bd22f4ecc15b7727e46570e7daa1e73
+    run     https://github.com/a23bc/dlipa-rebuild/actions/runs/39023655342
 
-## What the install log revealed
+## Point taken on scope
 
-TrollStore extracted a different set of entitlements from our binary than
-from the original: only `get-task-allow`, where the original also yielded
-`application-identifier`, `team-identifier` and `keychain-access-groups`.
+The goal is a rebuild that restores what DLiPA did, not a reproduction of the
+original bundle. That distinction cost real progress: several rounds went on
+byte-level parity with the original, and two of those fixed differences that
+turned out not to matter.
 
-## The cause
-Parsing the CodeDirectory of both binaries:
+Where parity *is* the right tool is narrow, and worth stating precisely:
+MobileInstallation types a bundle from a handful of identifying fields, so those
+fields have to be well formed. Nothing else about the bundle has to match.
 
-    original identifier   com.ahmedbafkir.dlipa
-    ours identifier       DLiPA
+## The actual defect
 
-ldid defaults the CodeDirectory identifier to the executable basename. Ours
-said `DLiPA`; the original carries the full bundle id. MobileInstallation
-reads that field to type the bundle, and a bare filename is not a valid
-identity - hence `ApplicationType = System`.
+The install log showed TrollStore reading one entitlement from our binary where
+it read three from the original:
 
-`-I` overrides it. Two details worth recording because both cost a build:
+    ours      get-task-allow
+    original  application-identifier
+              com.apple.developer.team-identifier
+              get-task-allow
 
-- ldid takes the value from `argv + 2`, so it must be attached: `-I<id>`.
-  `-I com.a23bc.dliparebuild` left the identifier empty and then treated the
-  bundle id as a file path.
-- Only the procursus build of ldid still has `-S`, and only it documents
-  `-I` alongside it.
+Without `application-identifier` the signature does not name an application, and
+MobileInstallation types it System. That is the 181.
+
+## What changed
+
+The entitlements plist passed to ldid now carries all three keys, written whole
+rather than assembled with `plutil -insert`, which validates values and rejected
+every team identifier offered - including a well-formed ten-character one.
+
+No certificate is involved and none is needed. The team value is arbitrary for a
+locally signed binary; TrollStore rewrites it when it re-signs on install.
 
 ## Verified in the shipped IPA
 
-    CodeDirectory identifier   com.a23bc.dliparebuild   (was: DLiPA)
-    _CodeSignature/CodeResources 10234 bytes
-    LC_CODE_SIGNATURE            present
-    bundle root                  unchanged and matching the original
+The DER entitlements slot now reads:
 
-## What still differs, and cannot be fixed here
+    application-identifier                    A23BC00001.com.a23bc.dliparebuild
+    com.apple.developer.team-identifier       A23BC00001
+    get-task-allow                            true
 
-The original carries a CMS signature in slot `0x10000` - a real signature
-from an Apple Development certificate. Ours has an alternate CodeDirectory
-in that slot instead, because producing a CMS signature needs a certificate
-chain and there is no developer account here.
-
-TrollStore exists precisely to install Apple-signed apps by bypassing that,
-and it re-signs on install regardless, so this is expected rather than
-blocking. Worth knowing in case the CoreTrust bypass behaves differently
-for a binary that never had one.
+Which is the same three keys, in the same form, as the original. The bundle root
+and the CodeResources manifest are unchanged from the previous build.
