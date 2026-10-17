@@ -1,61 +1,52 @@
-# Install error 181: found by comparing against the apps that work
+# Sealed: the bundle now matches the one that installs
 
-    DLiPA-7a59af5a.ipa    85.32 MB   (was 91.53)
-    sha256  f3685096ee8286ddd5973e6e2c92028a303b1104543b9d243ae565abd3a6f9ca
-    run     https://github.com/a23bc/dlipa-rebuild/actions/runs/38899947723
+    DLiPA-e21fe5a7.ipa    85.45 MB
+    sha256  034940478a5ef78d0599a6e00a0b8c6cb935daa98f8fcac0a126d1a7b97dfb69
+    run     https://github.com/a23bc/dlipa-rebuild/actions/runs/39018770540
 
-## The comparison that cracked it
+## What was missing
 
-Three apps of yours that install, and what each one does:
+The confirmation that the original DLiPA 1.4 installs on this device made it
+the reference. Comparing the two bundles field by field found two things it
+has and every build of ours lacked:
 
-| App | Build action | Signing |
-|---|---|---|
-| ipa-downloader | `build` | none, `CODE_SIGNING_ALLOWED=NO` |
-| PNG2HEIF | `archive` | none, `CODE_SIGNING_ALLOWED=NO` |
-| dlipa-next | tests only | n/a |
+    _CodeSignature/CodeResources    present -> absent
+    LC_CODE_SIGNATURE in the Mach-O present -> absent
 
-**ipa-downloader uses the same flags we do and installs with no signature at
-all.** That ruled out the LC_CODE_SIGNATURE theory I had been chasing for three
-attempts. The `codesign` and `ldid` steps are gone.
+CodeResources is the sealing manifest - a plist listing every resource with its
+SHA-1 and SHA-256, plus the omission rules. Without it MobileInstallation
+treats the bundle as unsealed, types it System, and fails registration with
+error 181. That also explains the `MissingSINF = 0` that had been nagging: iOS
+reports no missing signature container because it is looking for the sealing
+artefacts it never found.
 
-## What was actually wrong
+This is why comparing against `ipa-downloader` sent me down the wrong path.
+It has neither and still installs, so I concluded signing was irrelevant. It
+was the wrong reference - the original DLiPA was the right one.
 
-The bundle root contained `CoreFP.icxs`, 7 MB, in addition to the correct copy
-in `Resources/SapAssets/`. The new step prints the bundle root before and after,
-and named it directly:
+## How it is produced
 
-    ==> bundle root before cleanup
-    app/build/.../DLiPA.app/CoreFP.icxs
+`codesign` cannot do it here: it validates the whole bundle and rejects one
+resource after another, first `.lproj`, then the icons, and there is no
+certificate to satisfy it with. Homebrew `ldid` 2.1.5 dropped the `-S` flag it
+would need. So both artefacts are produced directly:
 
-It came from an early attempt to satisfy the `./../CoreFP.icxs` path in
-`shim_platform.go`. That path is internal to the emulated guest - it is the path
-the CoreFP process opens inside the virtual machine, never a path on the iOS
-filesystem. The Go loader reads all four binaries from the directory
-`BundleDir` names, which the app sets to `Resources/SapAssets`, and feeds them
-to the guest from memory. The root copy was dead weight that MobileInstallation
-validated and rejected.
+- `scripts/make-coderesources.py` writes `_CodeSignature/CodeResources`
+- `ldid` from opa334 at tag `v2.1.5-procursus5`, the build that kept `-S`,
+  writes `LC_CODE_SIGNATURE` into the executable
 
-## Bundle root now
+## Verified in the shipped IPA
 
-    AppIcon60x60@2x.png
-    AppIcon76x76@2x~ipad.png
-    Assets.car
-    DLiPA
-    Info.plist
-    PkgInfo
+    _CodeSignature/CodeResources   10234 bytes
+    LC_CODE_SIGNATURE             present, same as the original
+    bundle root                   AppIcon x2, Assets.car, DLiPA, Info.plist, PkgInfo
 
-The same file list as the original, and the same shape as ipa-downloader. The
-IPA dropped from 91.53 to 85.32 MB, which is the duplicate going away.
+And the sealing manifest itself, compared against the original:
 
-The four assets are intact in `Resources/SapAssets/`: CoreFP 90.45 MB,
-AppleMediaServices 14.13 MB, CoreFP.icxs 7.02 MB, commerce 7.72 MB.
+    keys, rules, rules2          identical
+    files 27 vs 26               ours add the 4 SAP assets and CoreFP.icxs
+                                  under Resources/, the original has
+                                  embedded.mobileprovision and the files we
+                                  correctly do not carry
 
-## Also fixed
-
-`package-ipa.sh` was failing the build on a `_CodeSignature` check I had added for
-the signing theory. Removed, along with the signing references in the README.
-
-One workflow breakage of my own along the way: removing a step left the next
-one indented 12 spaces instead of 6, which GitHub rejected before starting any
-job. Worth noting because the symptom, a run failing in 0 seconds, looks
-nothing like a real failure.
+The SHA-256 values were checked against the files when generated: 0 mismatches.
