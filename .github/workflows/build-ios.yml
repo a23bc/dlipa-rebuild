@@ -235,6 +235,31 @@ jobs:
           echo "path=$APP" >> "$GITHUB_OUTPUT"
           du -sh "$APP"
 
+      - name: Seal the bundle
+        run: |
+          # TrollStore error 181 with ApplicationType = System means
+          # MobileInstallation found the bundle unsealed. The original DLiPA 1.4,
+          # which installs, carries two things an unsigned Xcode build does not:
+          #
+          #   1. _CodeSignature/CodeResources, a plist listing every resource and
+          #      its SHA-256
+          #   2. an LC_CODE_SIGNATURE load command in the Mach-O executable
+          #
+          # codesign would emit both but refuses to walk .lproj directories, and
+          # Homebrew ldid no longer supports -S. So CodeResources is generated
+          # directly and the load command is patched in.
+          APP=$(find app/build -name "DLiPA.app" -maxdepth 4 -type d | head -n 1)
+          if [ -z "$APP" ]; then echo "::error::DLiPA.app not found"; exit 1; fi
+          python3 scripts/make-coderesources.py "$APP"
+          echo "==> CodeResources"
+          ls -la "$APP/_CodeSignature"
+          # The load command is what iOS reads to decide ApplicationType.
+          # codesign adds it to the executable without the bundle walk.
+          codesign --force --sign - --timestamp=none --entitlements /dev/null "$APP/DLiPA" 2>&1 || \
+          codesign --force --sign - --timestamp=none "$APP/DLiPA"
+          echo "==> executable signed"
+          codesign -dvv "$APP/DLiPA" 2>&1 | head -n 6
+
       - name: Check the bundle for stray files
         run: |
           # CoreFP.icxs was ending up at the bundle root as well as inside

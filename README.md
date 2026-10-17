@@ -5,7 +5,7 @@ to carry an `X-Apple-ActionSignature` header, and because the download endpoint
  advertised in `bag.xml` moved to `ent/download`. This repository rebuilds the
 app with both changes, and builds an installable IPA on GitHub Actions.
 
-**No Apple Developer account is required.** The IPA is built unsigned and you
+**No Apple Developer account is required.** The IPA is sealed but not signed with a certificate, and you
 sign it with your own Apple ID using AltStore or Sideloadly — the same flow the
 original DLiPA README recommended.
 
@@ -51,7 +51,8 @@ The controlled experiment behind the first two rows is in
     scripts/
       build-unicorn-ios.sh     cross-compiles Unicorn (arch=aarch64)
       stage-assets.sh          copies + SHA-256 verifies the Apple binaries
-      package-ipa.sh           unsigned .app -> .ipa
+      package-ipa.sh           sealed .app -> .ipa
+      make-coderesources.py    writes _CodeSignature/CodeResources
     patches/unicorn-ios.patch  iOS W^X fix for Unicorn
     VendorAssets/              the four Apple binaries, git-lfs
     .github/workflows/
@@ -68,7 +69,7 @@ Push to `main` or open a pull request. The workflow runs two jobs:
 1. **go-bridge** — unit tests, cross-compiles Unicorn for iOS arm64, binds the
    Go module into `SapBridge.framework` with gomobile.
 2. **app** — downloads the framework, stages and verifies the Apple assets,
-   builds an unsigned `.app`, packages it as `DLiPA-<digest>.ipa`, uploads it
+   builds the app, seals it with a generated CodeResources, packages it as `DLiPA-<digest>.ipa`, uploads it
    as an artifact. Tagged pushes also attach it to a release.
 
 Run it manually from the Actions tab with **Run workflow**.
@@ -89,7 +90,7 @@ Run it manually from the Actions tab with **Run workflow**.
     # 3. stage the assets
     ./scripts/stage-assets.sh
 
-    # 4. generate the project and build unsigned
+    # 4. generate the project and build
     cd app
     xcodegen generate
     xcodebuild -project DLiPA.xcodeproj -scheme DLiPA \

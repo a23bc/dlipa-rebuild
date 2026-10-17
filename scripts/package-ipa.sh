@@ -20,9 +20,9 @@ trap 'rm -rf "$WORK"' EXIT HUP INT TERM
 mkdir -p "$WORK/Payload"
 cp -R "$APP" "$WORK/Payload/"
 
-# No signature is added or removed. The apps that install under TrollStore are
-# packaged exactly this way: build unsigned, zip Payload. The signature is
-# applied on the device.
+# _CodeSignature is kept. It is the sealing manifest MobileInstallation reads,
+# and without it the bundle is typed as System and registration fails with
+# error 181. This step only copies; scripts/make-coderesources.py creates it.
 # iTunesArtwork is optional but some tools look for it.
 if [ -f "$APP/iTunesArtwork" ]; then
   cp "$APP/iTunesArtwork" "$WORK/"
