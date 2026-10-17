@@ -262,7 +262,9 @@ jobs:
           plutil -insert get-task-allow -bool true ent.plist
           /tmp/ldid-src/ldid -Sent.plist "$APP/DLiPA"
           rm -f ent.plist
-          echo "==> executable sealed"      - name: Check the bundle for stray files
+          echo "==> executable sealed"
+
+      - name: Check the bundle for stray files
         run: |
           # CoreFP.icxs was ending up at the bundle root as well as inside
           # Resources/SapAssets. The root copy is a leftover from an early
@@ -277,15 +279,6 @@ jobs:
           find "$APP" -maxdepth 1 -type f ! -name "Info.plist" ! -name "PkgInfo" ! -name "DLiPA" ! -name "Assets.car" ! -name "*.png" -print -delete
           echo "==> bundle root after cleanup"
           ls -la "$APP"
-
-      - name: Check the bundle for stray files
-        run: |
-          # CoreFP.icxs was ending up at the bundle root as well as inside
-          # Resources/SapAssets. The root copy was a leftover and is unnecessary:
-          # the Go loader reads the assets from the directory BundleDir names.
-          APP=$(find app/build -name "DLiPA.app" -maxdepth 4 -type d | head -n 1)
-          ls -la "$APP"
-          find "$APP" -maxdepth 1 -type f ! -name "Info.plist" ! -name "PkgInfo" ! -name "DLiPA" ! -name "Assets.car" ! -name "*.png" -print -delete
 
       - name: Package as IPA
         id: ipa
