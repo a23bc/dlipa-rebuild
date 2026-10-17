@@ -261,22 +261,32 @@ jobs:
           git clone --depth 1 --branch v2.1.5-procursus5 \
             https://github.com/opa334/ldid.git /tmp/ldid-src
           make -C /tmp/ldid-src -j"$(sysctl -n hw.ncpu)"
-          # The entitlements must name the application. Signing with only
+          # plutil -insert validates entitlement values and rejects team
+          # identifiers it does not recognise, so the plist is written whole.
+          #
+          # The identifier has to name the application: signing with only
           # get-task-allow leaves the signature without an
-          # application-identifier, so TrollStore reads a single entitlement
-          # and cannot type the bundle as an application. It stays System and
+          # application-identifier, so TrollStore reads a single entitlement and
+          # cannot type the bundle as an application. It stays System and
           # registration fails with 181.
           #
-          # No certificate is required for this: the identifier is just the
-          # team prefix the app is signed under, and for a locally signed binary
-          # any stable value works. TrollStore replaces it on install.
-          plutil -create xml1 ent.plist
-          plutil -insert application-identifier -string "A23BC00001.com.a23bc.dliparebuild" ent.plist
-          # A team identifier must be ten alphanumerics; anything shorter is
-          # rejected by plutil. The value is arbitrary - TrollStore rewrites it on
-          # install - but it has to be well formed.
-          plutil -insert "com.apple.developer.team-identifier" -string "A23BC00001" ent.plist
-          plutil -insert get-task-allow -bool true ent.plist
+          # No certificate is needed. The team value is arbitrary for a locally
+          # signed binary; TrollStore rewrites it on install.
+          cat > ent.plist <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+          	<key>application-identifier</key>
+          	<string>A23BC00001.com.a23bc.dliparebuild</string>
+          	<key>com.apple.developer.team-identifier</key>
+          	<string>A23BC00001</string>
+          	<key>get-task-allow</key>
+          	<true/>
+          </dict>
+          </plist>
+          PLIST
+          plutil -lint ent.plist
           # -I sets the CodeDirectory identifier. Without it ldid uses the
           # executable basename, which leaves the binary identified as "DLiPA"
           # instead of the bundle id, and MobileInstallation then types the
